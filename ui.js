@@ -305,10 +305,6 @@ function renderCenter() {
       const topCard = topOf(stack);
       el = buildCardEl(topCard, false);
       el.classList.add('center-stack-slot');
-      const badge = document.createElement('span');
-      badge.className = 'stack-slot-count';
-      badge.textContent = stack.length;
-      el.appendChild(badge);
 
       if (isWild(topCard)) {
         const wildLabel = document.createElement('span');
