@@ -28,7 +28,7 @@ const state = {
     aiNames: loadStored('spiteMaliceAiNames', [...DEFAULT_AI_NAMES]),
     gameName: loadStored('spiteMaliceGameName', 'Spite and Malice'),
     cardBack: loadStored('spiteMaliceCardBack', 'blue'),
-    aiDelay: 700,
+    aiDelay: 1000,
   },
 };
 
