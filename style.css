@@ -178,7 +178,8 @@ html, body {
   background: rgba(255,255,255,0.03);
 }
 
-/* Side stacks fan every card out vertically so buried cards stay readable */
+/* Side stacks preview their top 2 cards fanned in place; the rest are only
+   reachable through the full pile viewer (see #modal-pile-view). */
 .side-stack-fan {
   display: block;
   align-items: unset;
@@ -193,6 +194,9 @@ html, body {
   pointer-events: none;
 }
 .side-stack-fan .card:hover:not(.buried-card) { transform: translateY(-6px); }
+
+.side-stack-slot.has-more { cursor: pointer; }
+.side-stack-slot.has-more:hover .card { filter: brightness(1.08); }
 
 .stack-slot-ghost {
   font-size: .95rem;
@@ -453,6 +457,30 @@ html, body {
 .modal-actions button.primary:hover { filter: brightness(1.08); }
 
 #gameover-title { text-align: center; color: var(--gold); }
+
+/* ── Pile viewer ──────────────────────────────────────────── */
+.pile-view-hint {
+  font-size: .8rem;
+  color: #aaa;
+  text-align: center;
+  margin-top: -8px;
+}
+
+#pile-view-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  max-width: 480px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.pile-view-top {
+  outline: 3px solid #4ade80;
+  box-shadow: 0 0 16px rgba(74,222,128,.55);
+}
 
 /* ── Small screens ────────────────────────────────────────── */
 @media (max-width: 700px) {

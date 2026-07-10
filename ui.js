@@ -13,6 +13,9 @@ const elHand            = $('hand');
 const elStatusMsg       = $('status-msg');
 const elModalSettings   = $('modal-settings');
 const elModalGameOver   = $('modal-gameover');
+const elModalPileView   = $('modal-pile-view');
+
+const STACK_PREVIEW_COUNT = 2; // side stacks only show their top N cards in place
 
 let selected = null; // { type:'goal' } | { type:'side', idx } | { type:'hand', cardId }
 
@@ -52,6 +55,41 @@ $('btn-settings-apply').addEventListener('click', () => {
 });
 
 $('btn-gameover-newgame').addEventListener('click', () => bootGame(state.settings));
+
+// ── Pile viewer (full contents of a side stack) ──────────────────────────────
+
+function openPileView(stack, { title, interactiveTop = false, onTopClick = null } = {}) {
+  $('pile-view-title').textContent = title;
+  $('pile-view-hint').textContent = interactiveTop
+    ? 'Only the top card (highlighted) can be played or discarded to.'
+    : 'Only the top card (highlighted) is in play.';
+
+  const container = $('pile-view-cards');
+  container.innerHTML = '';
+  stack.forEach((card, i) => {
+    const isTop = i === stack.length - 1;
+    const el = buildCardEl(card, isTop && interactiveTop);
+    if (isTop) {
+      el.classList.add('pile-view-top');
+      if (interactiveTop && onTopClick) {
+        el.addEventListener('click', () => { onTopClick(); closePileView(); });
+      } else {
+        el.classList.add('not-selectable');
+      }
+    } else {
+      el.classList.add('not-selectable');
+    }
+    container.appendChild(el);
+  });
+
+  elModalPileView.classList.remove('hidden');
+}
+
+function closePileView() {
+  elModalPileView.classList.add('hidden');
+}
+
+$('btn-pile-view-close').addEventListener('click', closePileView);
 
 // ── Selection helpers ─────────────────────────────────────────────────────────
 
@@ -179,8 +217,14 @@ function renderOpponents() {
 
     const sideWrap = document.createElement('div');
     sideWrap.className = 'opponent-side-stacks';
-    p.sideStacks.forEach(stack => {
-      sideWrap.appendChild(buildFannedStackEl(stack, { mini: true }));
+    p.sideStacks.forEach((stack, sIdx) => {
+      const wrap = buildStackPreviewEl(stack, { mini: true });
+      if (stack.length > STACK_PREVIEW_COUNT) {
+        wrap.addEventListener('click', () => {
+          openPileView(stack, { title: `${p.name} — Side Stack ${sIdx + 1}` });
+        });
+      }
+      sideWrap.appendChild(wrap);
     });
     pilesRow.appendChild(sideWrap);
 
@@ -262,12 +306,20 @@ function renderPlayerZone() {
   elPlayerSideStacks.innerHTML = '';
   human.sideStacks.forEach((stack, idx) => {
     const topSelected = sameSource(selected, { type: 'side', idx });
-    const wrap = buildFannedStackEl(stack, { topInteractive: myTurn, topSelected });
+    const wrap = buildStackPreviewEl(stack, { topInteractive: myTurn, topSelected });
+
+    const doAction = () => {
+      if (handSelected) onOwnSideSlotClick(idx);
+      else if (myTurn && stack.length > 0) selectSource({ type: 'side', idx });
+    };
 
     if (handSelected) wrap.classList.add('valid-target');
     wrap.addEventListener('click', () => {
-      if (handSelected) onOwnSideSlotClick(idx);
-      else if (myTurn && stack.length > 0) selectSource({ type: 'side', idx });
+      if (stack.length > STACK_PREVIEW_COUNT) {
+        openPileView(stack, { title: `Side Stack ${idx + 1}`, interactiveTop: myTurn, onTopClick: doAction });
+      } else {
+        doAction();
+      }
     });
 
     elPlayerSideStacks.appendChild(wrap);
@@ -301,10 +353,10 @@ function statusMessage(myTurn, selectedCard, sel) {
   return canCenter ? 'Play it on the highlighted center stack.' : 'No legal play for that card right now.';
 }
 
-// Builds a side-stack slot showing every card fanned in place (bottom card at
-// the back, top card fully visible in front) so buried cards stay readable
-// instead of being hidden under just a count badge.
-function buildFannedStackEl(stack, { mini = false, topInteractive = false, topSelected = false } = {}) {
+// Builds a side-stack slot previewing only its top STACK_PREVIEW_COUNT cards,
+// fanned in place. Anything buried deeper is only reachable via the full
+// pile viewer modal (see openPileView) so the slot never grows unbounded.
+function buildStackPreviewEl(stack, { mini = false, topInteractive = false, topSelected = false } = {}) {
   const wrap = document.createElement('div');
   wrap.className = 'side-stack-slot' + (mini ? ' mini-slot' : '');
 
@@ -313,13 +365,16 @@ function buildFannedStackEl(stack, { mini = false, topInteractive = false, topSe
     return wrap;
   }
 
+  if (stack.length > STACK_PREVIEW_COUNT) wrap.classList.add('has-more');
+
+  const preview = stack.slice(-STACK_PREVIEW_COUNT);
   wrap.classList.add('side-stack-fan');
   const offset = mini ? 12 : 22;
   const cardH = mini ? 58 : 100;
-  wrap.style.height = `${offset * (stack.length - 1) + cardH}px`;
+  wrap.style.height = `${offset * (preview.length - 1) + cardH}px`;
 
-  stack.forEach((card, i) => {
-    const isTop = i === stack.length - 1;
+  preview.forEach((card, i) => {
+    const isTop = i === preview.length - 1;
     const el = buildCardEl(card, topInteractive && isTop);
     if (mini) el.classList.add('mini-card');
     el.style.top = `${i * offset}px`;
