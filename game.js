@@ -50,10 +50,15 @@ function newGame(settings) {
 
   let deck = shuffle(buildDeck(numPlayers)); // 1 deck per player keeps the card pool comfortable
 
+  // Randomize which AI identities show up (and in what order) each game,
+  // rather than always facing the same opponent(s) in the same slots.
+  const aiNamePool = (state.settings.aiNames && state.settings.aiNames.length) ? state.settings.aiNames : DEFAULT_AI_NAMES;
+  const shuffledAiNames = shuffle(aiNamePool);
+
   state.players = [];
   for (let i = 0; i < numPlayers; i++) {
     state.players.push({
-      name: i === 0 ? (state.settings.humanName || 'You') : (state.settings.aiNames[i - 1] || DEFAULT_AI_NAMES[i - 1] || `AI ${i}`),
+      name: i === 0 ? (state.settings.humanName || 'You') : (shuffledAiNames[i - 1] || DEFAULT_AI_NAMES[i - 1] || `AI ${i}`),
       isHuman: i === 0,
       goalPile: deck.splice(0, goalPileSize),
       sideStacks: Array.from({ length: SIDE_STACK_COUNT }, () => []),
