@@ -213,18 +213,26 @@ function computeAiPlay(playerIdx) {
     if (targets.length) candidates.push({ priority: 0, source: { type: 'goal' }, stackIdx: pickBestTarget(targets) });
   }
 
+  // Goal pile and hand (except Kings, saved for later) take priority over
+  // side stacks -- only dip into a side stack's top card when nothing
+  // better is available this step.
+  p.hand.forEach(card => {
+    if (isWild(card)) return;
+    const targets = legalCenterTargets(card);
+    if (targets.length) candidates.push({ priority: 1, source: { type: 'hand', cardId: card.id }, stackIdx: pickBestTarget(targets) });
+  });
+
   p.sideStacks.forEach((s, idx) => {
     if (s.length === 0) return;
     const card = topOf(s);
     const targets = legalCenterTargets(card);
-    if (targets.length) candidates.push({ priority: 1, source: { type: 'side', idx }, stackIdx: pickBestTarget(targets) });
+    if (targets.length) candidates.push({ priority: 2, source: { type: 'side', idx }, stackIdx: pickBestTarget(targets) });
   });
 
   p.hand.forEach(card => {
+    if (!isWild(card)) return;
     const targets = legalCenterTargets(card);
-    if (targets.length) {
-      candidates.push({ priority: isWild(card) ? 3 : 2, source: { type: 'hand', cardId: card.id }, stackIdx: pickBestTarget(targets) });
-    }
+    if (targets.length) candidates.push({ priority: 3, source: { type: 'hand', cardId: card.id }, stackIdx: pickBestTarget(targets) });
   });
 
   if (!candidates.length) return null;
@@ -232,19 +240,37 @@ function computeAiPlay(playerIdx) {
   return candidates[0];
 }
 
-// Only the top card of a side stack is ever reachable again, so spread
-// discards across all 4 stacks (start an empty one) rather than burying
-// everything in whichever stack happened to get the first card. Once all
-// 4 are started, keep them balanced by adding to the shortest.
-function pickAiSideStackTarget(player) {
-  const emptyIdx = player.sideStacks.findIndex(s => s.length === 0);
-  if (emptyIdx !== -1) return emptyIdx;
+const SIDE_STACK_RANK_VALUE = { A: 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, J: 11, Q: 12, K: 13 };
 
-  let best = 0;
-  for (let i = 1; i < player.sideStacks.length; i++) {
-    if (player.sideStacks[i].length < player.sideStacks[best].length) best = i;
+// Chooses where to discard `card` among the player's side stacks:
+//  1. Continue a descending "staircase" (this card sits one rank below an
+//     existing stack's top) so the pile stays organized and the next card
+//     it exposes is already the next logical one to unbury.
+//  2. Otherwise keep at least one stack completely open as a safety valve --
+//     only start a new stack while 2 or fewer are already in use.
+//  3. Otherwise balance by adding to whichever active stack is shortest.
+function pickAiSideStackTarget(player, card) {
+  const cardVal = SIDE_STACK_RANK_VALUE[card.value];
+  if (cardVal != null) {
+    const staircaseIdx = player.sideStacks.findIndex(s =>
+      s.length > 0 && SIDE_STACK_RANK_VALUE[topOf(s).value] === cardVal + 1);
+    if (staircaseIdx !== -1) return staircaseIdx;
   }
-  return best;
+
+  const nonEmpty = player.sideStacks.filter(s => s.length > 0).length;
+  if (nonEmpty < player.sideStacks.length - 1) {
+    const emptyIdx = player.sideStacks.findIndex(s => s.length === 0);
+    if (emptyIdx !== -1) return emptyIdx;
+  }
+
+  let best = -1;
+  player.sideStacks.forEach((s, i) => {
+    if (s.length > 0 && (best === -1 || s.length < player.sideStacks[best].length)) best = i;
+  });
+  if (best !== -1) return best;
+
+  const emptyIdx = player.sideStacks.findIndex(s => s.length === 0);
+  return emptyIdx !== -1 ? emptyIdx : 0;
 }
 
 // Returns { cardId, sideIdx } for the AI's mandatory end-of-turn discard, or
@@ -254,19 +280,31 @@ function computeAiDiscard(playerIdx) {
   if (p.hand.length === 0) return null;
 
   const RANK_ORDER = { A: 0, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5, '7': 6, '8': 7, '9': 8, '10': 9, J: 10, Q: 11, K: 12 };
+
+  // A card buried in a side stack never returns to the shared stock (unlike
+  // one played to a center stack, which recirculates once that stack
+  // completes). So if an opponent's goal pile is topped with a rank we're
+  // holding, burying that rank denies them the chance to ever draw it back.
+  const opponentWantedRanks = new Set(
+    state.players
+      .filter((pl, i) => i !== playerIdx && !pl.finished && pl.goalPile.length > 0)
+      .map(pl => topOf(pl.goalPile).value)
+  );
+
   // Keep Kings (wild) and Aces (stack-starters) in hand as long as possible;
-  // among ordinary cards, shed the highest ranks first.
+  // among ordinary cards, shed the highest ranks first, favoring cards an
+  // opponent is stuck waiting on.
   const scored = p.hand.map(c => {
-    let score;
-    if (c.value === 'K') score = -2;
-    else if (c.value === 'A') score = -1;
-    else score = RANK_ORDER[c.value];
+    if (c.value === 'K') return { card: c, score: -2 };
+    if (c.value === 'A') return { card: c, score: -1 };
+    let score = RANK_ORDER[c.value];
+    if (opponentWantedRanks.has(c.value)) score += 15;
     return { card: c, score };
   });
   scored.sort((a, b) => b.score - a.score);
   const choice = scored[0].card;
 
-  const sideIdx = pickAiSideStackTarget(p);
+  const sideIdx = pickAiSideStackTarget(p, choice);
 
   return { cardId: choice.id, sideIdx };
 }
