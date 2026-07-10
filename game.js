@@ -232,6 +232,21 @@ function computeAiPlay(playerIdx) {
   return candidates[0];
 }
 
+// Only the top card of a side stack is ever reachable again, so spread
+// discards across all 4 stacks (start an empty one) rather than burying
+// everything in whichever stack happened to get the first card. Once all
+// 4 are started, keep them balanced by adding to the shortest.
+function pickAiSideStackTarget(player) {
+  const emptyIdx = player.sideStacks.findIndex(s => s.length === 0);
+  if (emptyIdx !== -1) return emptyIdx;
+
+  let best = 0;
+  for (let i = 1; i < player.sideStacks.length; i++) {
+    if (player.sideStacks[i].length < player.sideStacks[best].length) best = i;
+  }
+  return best;
+}
+
 // Returns { cardId, sideIdx } for the AI's mandatory end-of-turn discard, or
 // null if the hand is empty (nothing left to discard).
 function computeAiDiscard(playerIdx) {
@@ -251,8 +266,7 @@ function computeAiDiscard(playerIdx) {
   scored.sort((a, b) => b.score - a.score);
   const choice = scored[0].card;
 
-  let sideIdx = p.sideStacks.findIndex(s => s.length > 0);
-  if (sideIdx === -1) sideIdx = 0; // start a fresh personal side stack
+  const sideIdx = pickAiSideStackTarget(p);
 
   return { cardId: choice.id, sideIdx };
 }
