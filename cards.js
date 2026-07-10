@@ -8,10 +8,6 @@ const VALUES = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'
 const RANK_SEQ = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q'];
 const STACK_LENGTH = RANK_SEQ.length; // 12 — a complete center stack has 12 cards
 
-// Rank weight used only to compare initial goal-pile flips for turn order.
-// Ace is low (it opens a center stack), King is high (it's the wild card).
-const FIRST_PLAYER_RANK = { A: 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, J: 11, Q: 12, K: 13 };
-
 let _cardSeq = 0;
 
 function buildDeck(numDecks) {

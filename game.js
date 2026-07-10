@@ -80,26 +80,7 @@ function newGame(settings) {
 // Highest face-up goal-pile card goes first; ties are broken by comparing the
 // next card down each tied player's pile until the tie breaks.
 function determineFirstPlayer() {
-  let candidates = state.players.map((_, i) => i);
-  let depth = 1;
-  const maxDepth = state.players[0].goalPile.length;
-
-  while (candidates.length > 1 && depth <= maxDepth) {
-    let best = -1;
-    let bestRank = -1;
-    let tied = [];
-    for (const idx of candidates) {
-      const pile = state.players[idx].goalPile;
-      const card = pile[pile.length - depth];
-      const rank = card ? FIRST_PLAYER_RANK[card.value] : -1;
-      if (rank > bestRank) { bestRank = rank; tied = [idx]; }
-      else if (rank === bestRank) { tied.push(idx); }
-    }
-    candidates = tied;
-    depth++;
-  }
-
-  return candidates[Math.floor(Math.random() * candidates.length)];
+  return Math.floor(Math.random() * state.players.length);
 }
 
 // ── Draw ──────────────────────────────────────────────────────────────────────
