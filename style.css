@@ -124,7 +124,12 @@ html, body {
   letter-spacing: 1px;
 }
 
-/* Smaller cards for the opponent's goal pile so a seat doesn't dominate the table */
+.opponent-side-stacks {
+  display: flex;
+  gap: 4px;
+}
+
+/* Smaller cards for the opponent's goal pile and side stacks so a seat doesn't dominate the table */
 .mini-card, .mini-slot {
   --card-w: 40px;
   --card-h: 58px;

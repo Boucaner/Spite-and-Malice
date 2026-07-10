@@ -249,7 +249,29 @@ function renderOpponents() {
     goalWrap.appendChild(goalLabel);
     pilesRow.appendChild(goalWrap);
 
-    // Opponents' side stacks are intentionally hidden from the human player.
+    // Only the top card of each side stack is visible — nothing buried
+    // underneath is ever shown, and there's no way to view the rest.
+    const sideWrap = document.createElement('div');
+    sideWrap.className = 'opponent-side-stacks';
+    p.sideStacks.forEach(stack => {
+      if (stack.length > 0) {
+        const top = buildCardEl(topOf(stack), false);
+        top.classList.add('mini-card');
+        if (stack.length > 1) {
+          const badge = document.createElement('span');
+          badge.className = 'stack-slot-count';
+          badge.textContent = stack.length;
+          top.appendChild(badge);
+        }
+        sideWrap.appendChild(top);
+      } else {
+        const empty = document.createElement('div');
+        empty.className = 'side-stack-slot stack-slot-empty mini-slot';
+        sideWrap.appendChild(empty);
+      }
+    });
+    pilesRow.appendChild(sideWrap);
+
     seat.appendChild(pilesRow);
     elOpponentsRow.appendChild(seat);
   });
