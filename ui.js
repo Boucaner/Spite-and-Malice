@@ -351,15 +351,25 @@ function renderPlayerZone() {
     const topSelected = sameSource(selected, { type: 'side', idx });
     const wrap = buildStackPreviewEl(stack, { topInteractive: myTurn, topSelected });
 
+    // Direct board click: toggles, consistent with hand/goal-pile selection elsewhere.
     const doAction = () => {
       if (handSelected) onOwnSideSlotClick(idx);
       else if (myTurn && stack.length > 0) selectSource({ type: 'side', idx });
     };
 
+    // Click on the top card from inside the pile viewer: always a deliberate,
+    // one-shot pick — must never silently toggle off an existing selection.
+    const selectFromViewer = () => {
+      if (handSelected) { onOwnSideSlotClick(idx); return; }
+      if (!myTurn || stack.length === 0) return;
+      selected = { type: 'side', idx };
+      render();
+    };
+
     if (handSelected) wrap.classList.add('valid-target');
     wrap.addEventListener('click', () => {
       if (!handSelected && stack.length > STACK_PREVIEW_COUNT) {
-        openPileView(stack, { title: `Side Stack ${idx + 1}`, interactiveTop: myTurn, onTopClick: doAction });
+        openPileView(stack, { title: `Side Stack ${idx + 1}`, interactiveTop: myTurn, onTopClick: selectFromViewer });
       } else {
         doAction();
       }
