@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Background -->
+  <rect width="64" height="64" rx="10" fill="#1b4332"/>
+  <!-- Card body (tilted) -->
+  <g transform="rotate(-8 32 32)">
+    <rect x="17" y="10" width="30" height="42" rx="4" fill="#fffdf5" stroke="#f4d03f" stroke-width="2"/>
+    <text x="24" y="26" font-family="Georgia, serif" font-size="14" font-weight="700" fill="#c0392b">K</text>
+    <text x="24" y="50" font-family="Georgia, serif" font-size="14" font-weight="700" fill="#c0392b" transform="rotate(180 32 44)">K</text>
+    <path d="M32,26 l4,7 h-8 z" fill="#c0392b"/>
+  </g>
+</svg>

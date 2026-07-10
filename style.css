@@ -1,0 +1,445 @@
+/* ── Reset & base ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+.hidden { display: none !important; }
+
+:root {
+  --green:       #2d6a4f;
+  --green-light: #40916c;
+  --felt:        #1b4332;
+  --card-w:      70px;
+  --card-h:      100px;
+  --card-radius: 8px;
+  --red:         #c0392b;
+  --gold:        #f4d03f;
+  --shadow:      0 4px 12px rgba(0,0,0,.5);
+}
+
+html, body {
+  height: 100%;
+  font-family: 'Segoe UI', sans-serif;
+  background: #111;
+  color: #eee;
+  overflow: hidden;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* ── Top bar ──────────────────────────────────────────────── */
+#topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #0d0d0d;
+  padding: 6px 14px;
+  border-bottom: 1px solid #333;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+#game-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+#topbar-controls { display: flex; gap: 8px; }
+
+#topbar-controls button {
+  background: #222;
+  border: 1px solid #444;
+  color: #ccc;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: .85rem;
+}
+#topbar-controls button:hover { background: #333; }
+
+/* ── Table ────────────────────────────────────────────────── */
+#table {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: radial-gradient(ellipse at center, var(--green-light) 0%, var(--felt) 60%, #0f2418 100%);
+  display: flex;
+  flex-direction: column;
+}
+
+#opponents-row {
+  flex: 0 1 auto;
+  display: flex;
+  justify-content: space-evenly;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 14px;
+  min-height: 0;
+}
+
+.opponent-seat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  transition: outline .15s;
+}
+.opponent-seat.active {
+  outline: 2px solid var(--gold);
+  box-shadow: 0 0 14px rgba(244,208,63,.35);
+}
+
+.opponent-name {
+  font-size: .78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #ddd;
+}
+
+.opponent-row-piles {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+.opponent-goal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.opponent-goal-label {
+  font-size: .58rem;
+  color: #bbb;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.opponent-side-stacks {
+  display: flex;
+  gap: 4px;
+}
+
+/* Smaller cards for opponent side stacks so a seat doesn't dominate the table */
+.mini-card, .mini-slot {
+  --card-w: 40px;
+  --card-h: 58px;
+}
+
+/* ── Center row (stock + building stacks) ─────────────────── */
+#center-row {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 36px;
+}
+
+#stock-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+#stock-label {
+  font-size: .65rem;
+  color: #ccc;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+#center-stacks {
+  display: flex;
+  gap: 14px;
+}
+
+.center-stack-slot, .side-stack-slot {
+  width: var(--card-w);
+  height: var(--card-h);
+  border-radius: var(--card-radius);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stack-slot-empty {
+  border: 2px dashed rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.03);
+}
+
+.stack-slot-ghost {
+  font-size: .95rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.35);
+  letter-spacing: 1px;
+  text-align: center;
+}
+
+.stack-slot-count {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  background: #000;
+  color: #ddd;
+  font-size: .62rem;
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 1px 5px;
+  border: 1px solid #444;
+}
+
+/* Valid destination for the currently-selected card */
+.valid-target {
+  outline: 3px solid #4ade80;
+  box-shadow: 0 0 16px rgba(74,222,128,.55);
+  cursor: pointer;
+}
+.valid-target.stack-slot-empty {
+  border-color: #4ade80;
+}
+
+/* ── Face-down cards ──────────────────────────────────────── */
+.card-back {
+  width: var(--card-w);
+  height: var(--card-h);
+  border-radius: var(--card-radius);
+  background: repeating-linear-gradient(135deg, #1a237e 0px, #1a237e 8px, #283593 8px, #283593 16px);
+  border: 2px solid rgba(255,255,255,0.18);
+  box-shadow: var(--shadow);
+  position: relative;
+}
+.card-back::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 3px;
+  pointer-events: none;
+}
+.card-back.count-badge::after {
+  content: attr(data-count);
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #ffffffcc;
+}
+
+/* ── Cards ────────────────────────────────────────────────── */
+.card {
+  width: var(--card-w);
+  height: var(--card-h);
+  border-radius: var(--card-radius);
+  background: #fff;
+  border: 1.5px solid #ccc;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 4px 5px;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  transition: transform .15s, box-shadow .15s;
+}
+
+.card:hover { transform: translateY(-6px); box-shadow: 0 8px 20px rgba(0,0,0,.6); }
+
+.card.selected {
+  transform: translateY(-14px);
+  box-shadow: 0 12px 24px rgba(0,0,0,.7);
+  outline: 2px solid var(--gold);
+}
+
+.card.not-selectable { cursor: default; }
+.card.not-selectable:hover { transform: none; box-shadow: var(--shadow); }
+
+.card.red .card-value, .card.red .card-suit { color: var(--red); }
+.card.black .card-value, .card.black .card-suit { color: #111; }
+
+.card-value {
+  font-size: .9rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.card-suit {
+  font-size: 1.6rem;
+  line-height: 1;
+  text-align: center;
+  margin: auto 0;
+}
+
+.card-value-bottom {
+  font-size: .9rem;
+  font-weight: 700;
+  line-height: 1;
+  align-self: flex-end;
+  transform: rotate(180deg);
+}
+
+/* Kings glow gold — they're wild */
+.card.wild {
+  background: linear-gradient(135deg, #fffde7, #fff9c4);
+  border-color: var(--gold);
+  box-shadow: 0 0 12px #f4d03f88, var(--shadow);
+}
+
+/* ── Player zone ──────────────────────────────────────────── */
+#player-zone {
+  background: linear-gradient(to top, #0d0d0d 60%, transparent);
+  padding: 10px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+#player-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#player-name {
+  font-size: .85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+#turn-indicator {
+  font-size: .7rem;
+  color: #4ade80;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+#player-piles-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 28px;
+}
+
+#player-goal-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+#player-goal-label {
+  font-size: .62rem;
+  color: #ccc;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+#player-side-stacks {
+  display: flex;
+  gap: 10px;
+}
+
+#hand-row {
+  min-height: calc(var(--card-h) + 10px);
+  display: flex;
+  align-items: center;
+}
+
+#hand {
+  display: flex;
+  gap: 6px;
+}
+
+#status-msg {
+  font-size: .8rem;
+  color: #bbb;
+  text-align: center;
+  min-height: 1.2em;
+}
+
+/* ── Modals ───────────────────────────────────────────────── */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.modal.hidden { display: none; }
+
+.modal-box {
+  background: #1c1c1e;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 28px 36px;
+  min-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modal-box h2 { font-size: 1.3rem; color: #ddd; }
+
+.modal-box label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: .85rem;
+  color: #aaa;
+}
+
+.modal-box label input,
+.modal-box label select {
+  background: #2a2a2e;
+  border: 1px solid #444;
+  color: #eee;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: .9rem;
+}
+
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+.modal-actions button {
+  background: #2a2a2e;
+  border: 1px solid #444;
+  color: #eee;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: .85rem;
+}
+.modal-actions button:hover { background: #333; }
+.modal-actions button.primary {
+  background: var(--gold);
+  color: #222;
+  border-color: var(--gold);
+  font-weight: 700;
+}
+.modal-actions button.primary:hover { filter: brightness(1.08); }
+
+#gameover-title { text-align: center; color: var(--gold); }
+
+/* ── Small screens ────────────────────────────────────────── */
+@media (max-width: 700px) {
+  :root { --card-w: 54px; --card-h: 78px; }
+  #player-piles-row { gap: 14px; }
+  #center-stacks { gap: 8px; }
+}

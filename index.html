@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Spite and Malice</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1b4332">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- Top bar -->
+    <div id="topbar">
+      <span id="game-title">Spite and Malice</span>
+      <span id="build-tag" style="font-size:.65rem;color:#555;letter-spacing:1px;">v1.0</span>
+      <div id="topbar-controls">
+        <button id="btn-settings">⚙ Settings</button>
+        <button id="btn-new-game">New Game</button>
+      </div>
+    </div>
+
+    <!-- Main table -->
+    <div id="table">
+      <div id="opponents-row"></div>
+
+      <div id="center-row">
+        <div id="stock-area">
+          <div id="stock-pile"></div>
+          <div id="stock-label">Stock</div>
+        </div>
+        <div id="center-stacks"></div>
+      </div>
+    </div>
+
+    <!-- Human player zone -->
+    <div id="player-zone">
+      <div id="player-info">
+        <span id="player-name">You</span>
+        <span id="turn-indicator" class="hidden">Your turn</span>
+      </div>
+
+      <div id="player-piles-row">
+        <div id="player-goal-area">
+          <div id="player-goal-pile"></div>
+          <div id="player-goal-label">Goal Pile</div>
+        </div>
+        <div id="player-side-stacks"></div>
+      </div>
+
+      <div id="hand-row">
+        <div id="hand"></div>
+      </div>
+
+      <div id="status-msg"></div>
+    </div>
+
+  </div>
+
+  <!-- Settings modal -->
+  <div id="modal-settings" class="modal hidden">
+    <div class="modal-box">
+      <h2>Settings</h2>
+      <label>
+        Game name
+        <input type="text" id="setting-game-name" maxlength="24" placeholder="Spite and Malice">
+      </label>
+      <label>
+        Number of players
+        <select id="setting-players">
+          <option value="2" selected>2 (you + 1 AI)</option>
+          <option value="3">3 (you + 2 AI)</option>
+          <option value="4">4 (you + 3 AI)</option>
+        </select>
+      </label>
+      <label>
+        AI speed
+        <select id="setting-ai-speed">
+          <option value="1100">Slow</option>
+          <option value="700" selected>Normal</option>
+          <option value="300">Fast</option>
+        </select>
+      </label>
+      <div class="modal-actions">
+        <button id="btn-settings-close">Close</button>
+        <button id="btn-settings-apply" class="primary">Apply &amp; New Game</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game over modal -->
+  <div id="modal-gameover" class="modal hidden">
+    <div class="modal-box">
+      <h2 id="gameover-title">Game Over</h2>
+      <div class="modal-actions">
+        <button id="btn-gameover-newgame" class="primary">New Game</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="cards.js"></script>
+  <script src="game.js"></script>
+  <script src="ui.js"></script>
+</body>
+</html>
