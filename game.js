@@ -175,6 +175,12 @@ function playToCenter(playerIdx, source, stackIdx) {
     state.winner = playerIdx;
   }
 
+  // Playing out a full hand mid-turn refills it immediately so the turn
+  // continues instead of leaving the player stuck with nothing to discard.
+  if (state.phase === 'playing' && p.hand.length === 0) {
+    drawToFive(p);
+  }
+
   return { ok: true };
 }
 
