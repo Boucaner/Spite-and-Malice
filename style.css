@@ -134,6 +134,8 @@ html, body {
   --card-w: 40px;
   --card-h: 58px;
 }
+.mini-card .card-value, .mini-card .card-value-bottom { font-size: .65rem; }
+.mini-card .card-suit { font-size: 1.1rem; }
 
 /* ── Center row (stock + building stacks) ─────────────────── */
 #center-row {

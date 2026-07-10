@@ -66,8 +66,9 @@ function openPileView(stack, { title, interactiveTop = false, onTopClick = null 
 
   const container = $('pile-view-cards');
   container.innerHTML = '';
-  stack.forEach((card, i) => {
-    const isTop = i === stack.length - 1;
+  // Top card first (leftmost), then down to the bottom of the pile.
+  [...stack].reverse().forEach((card, i) => {
+    const isTop = i === 0;
     const el = buildCardEl(card, isTop && interactiveTop);
     if (isTop) {
       el.classList.add('pile-view-top');
@@ -369,7 +370,7 @@ function buildStackPreviewEl(stack, { mini = false, topInteractive = false, topS
 
   const preview = stack.slice(-STACK_PREVIEW_COUNT);
   wrap.classList.add('side-stack-fan');
-  const offset = mini ? 12 : 22;
+  const offset = 22;
   const cardH = mini ? 58 : 100;
   wrap.style.height = `${offset * (preview.length - 1) + cardH}px`;
 
