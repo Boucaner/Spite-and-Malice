@@ -180,15 +180,7 @@ function renderOpponents() {
     const sideWrap = document.createElement('div');
     sideWrap.className = 'opponent-side-stacks';
     p.sideStacks.forEach(stack => {
-      if (stack.length > 0) {
-        const top = buildCardEl(topOf(stack), false);
-        top.classList.add('mini-card');
-        sideWrap.appendChild(top);
-      } else {
-        const empty = document.createElement('div');
-        empty.className = 'side-stack-slot stack-slot-empty mini-slot';
-        sideWrap.appendChild(empty);
-      }
+      sideWrap.appendChild(buildFannedStackEl(stack, { mini: true }));
     });
     pilesRow.appendChild(sideWrap);
 
@@ -269,22 +261,16 @@ function renderPlayerZone() {
 
   elPlayerSideStacks.innerHTML = '';
   human.sideStacks.forEach((stack, idx) => {
-    let el;
-    if (stack.length > 0) {
-      el = buildCardEl(topOf(stack), myTurn);
-      if (sameSource(selected, { type: 'side', idx })) el.classList.add('selected');
-      if (!myTurn) el.classList.add('not-selectable');
-      const badge = document.createElement('span');
-      badge.className = 'stack-slot-count';
-      badge.textContent = stack.length;
-      el.appendChild(badge);
-      el.addEventListener('click', () => selectSource({ type: 'side', idx }));
-    } else {
-      el = document.createElement('div');
-      el.className = 'side-stack-slot stack-slot-empty';
-    }
-    if (handSelected) { el.classList.add('valid-target'); el.addEventListener('click', () => onOwnSideSlotClick(idx)); }
-    elPlayerSideStacks.appendChild(el);
+    const topSelected = sameSource(selected, { type: 'side', idx });
+    const wrap = buildFannedStackEl(stack, { topInteractive: myTurn, topSelected });
+
+    if (handSelected) wrap.classList.add('valid-target');
+    wrap.addEventListener('click', () => {
+      if (handSelected) onOwnSideSlotClick(idx);
+      else if (myTurn && stack.length > 0) selectSource({ type: 'side', idx });
+    });
+
+    elPlayerSideStacks.appendChild(wrap);
   });
 
   // Hand
@@ -313,6 +299,43 @@ function statusMessage(myTurn, selectedCard, sel) {
       : 'No center play available — discard it to one of your side stacks.';
   }
   return canCenter ? 'Play it on the highlighted center stack.' : 'No legal play for that card right now.';
+}
+
+// Builds a side-stack slot showing every card fanned in place (bottom card at
+// the back, top card fully visible in front) so buried cards stay readable
+// instead of being hidden under just a count badge.
+function buildFannedStackEl(stack, { mini = false, topInteractive = false, topSelected = false } = {}) {
+  const wrap = document.createElement('div');
+  wrap.className = 'side-stack-slot' + (mini ? ' mini-slot' : '');
+
+  if (stack.length === 0) {
+    wrap.classList.add('stack-slot-empty');
+    return wrap;
+  }
+
+  wrap.classList.add('side-stack-fan');
+  const offset = mini ? 12 : 22;
+  const cardH = mini ? 58 : 100;
+  wrap.style.height = `${offset * (stack.length - 1) + cardH}px`;
+
+  stack.forEach((card, i) => {
+    const isTop = i === stack.length - 1;
+    const el = buildCardEl(card, topInteractive && isTop);
+    if (mini) el.classList.add('mini-card');
+    el.style.top = `${i * offset}px`;
+    el.style.zIndex = String(i);
+    if (!isTop) el.classList.add('buried-card');
+    if (isTop && topSelected) el.classList.add('selected');
+    if (!isTop || !topInteractive) el.classList.add('not-selectable');
+    wrap.appendChild(el);
+  });
+
+  const badge = document.createElement('span');
+  badge.className = 'stack-slot-count';
+  badge.textContent = stack.length;
+  wrap.appendChild(badge);
+
+  return wrap;
 }
 
 // ── Card element builder ──────────────────────────────────────────────────────

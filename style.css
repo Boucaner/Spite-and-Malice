@@ -178,6 +178,22 @@ html, body {
   background: rgba(255,255,255,0.03);
 }
 
+/* Side stacks fan every card out vertically so buried cards stay readable */
+.side-stack-fan {
+  display: block;
+  align-items: unset;
+  justify-content: unset;
+}
+.side-stack-fan .card {
+  position: absolute;
+  left: 0;
+}
+.side-stack-fan .card.buried-card {
+  cursor: default;
+  pointer-events: none;
+}
+.side-stack-fan .card:hover:not(.buried-card) { transform: translateY(-6px); }
+
 .stack-slot-ghost {
   font-size: .95rem;
   font-weight: 700;
@@ -197,6 +213,7 @@ html, body {
   border-radius: 8px;
   padding: 1px 5px;
   border: 1px solid #444;
+  z-index: 999;
 }
 
 /* Valid destination for the currently-selected card */
