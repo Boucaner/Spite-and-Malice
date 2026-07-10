@@ -1,6 +1,6 @@
 // ── Game state ────────────────────────────────────────────────────────────────
 
-const DEFAULT_AI_NAMES = ['Alice', 'Bob', 'Carlos'];
+const DEFAULT_AI_NAMES = ['Emma', 'Kate', 'Andrew', 'Jack'];
 const GOAL_PILE_SIZE = 20;
 const HAND_SIZE = 5;
 const SIDE_STACK_COUNT = 4;
