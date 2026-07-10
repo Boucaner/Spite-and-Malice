@@ -224,20 +224,21 @@ function computeAiPlay(playerIdx) {
     if (targets.length) candidates.push({ priority: 0, source: { type: 'goal' }, stackIdx: pickBestTarget(targets) });
   }
 
-  // Goal pile and hand (except Kings, saved for later) take priority over
-  // side stacks -- only dip into a side stack's top card when nothing
-  // better is available this step.
-  p.hand.forEach(card => {
-    if (isWild(card)) return;
-    const targets = legalCenterTargets(card);
-    if (targets.length) candidates.push({ priority: 1, source: { type: 'hand', cardId: card.id }, stackIdx: pickBestTarget(targets) });
-  });
-
+  // After the goal pile, clearing side stacks outranks the hand -- freeing a
+  // blocked side stack unlocks whatever's buried beneath it, whereas hand
+  // cards are better held back to connect plays or cover the end-of-turn
+  // discard. Kings stay lowest of all, saved for when nothing else fits.
   p.sideStacks.forEach((s, idx) => {
     if (s.length === 0) return;
     const card = topOf(s);
     const targets = legalCenterTargets(card);
-    if (targets.length) candidates.push({ priority: 2, source: { type: 'side', idx }, stackIdx: pickBestTarget(targets) });
+    if (targets.length) candidates.push({ priority: 1, source: { type: 'side', idx }, stackIdx: pickBestTarget(targets) });
+  });
+
+  p.hand.forEach(card => {
+    if (isWild(card)) return;
+    const targets = legalCenterTargets(card);
+    if (targets.length) candidates.push({ priority: 2, source: { type: 'hand', cardId: card.id }, stackIdx: pickBestTarget(targets) });
   });
 
   p.hand.forEach(card => {
@@ -247,7 +248,14 @@ function computeAiPlay(playerIdx) {
   });
 
   if (!candidates.length) return null;
-  candidates.sort((a, b) => a.priority - b.priority);
+  candidates.sort((a, b) => {
+    if (a.priority !== b.priority) return a.priority - b.priority;
+    // Among equally-ranked side-stack plays, clear the most-blocked (tallest) one first.
+    if (a.source.type === 'side' && b.source.type === 'side') {
+      return p.sideStacks[b.source.idx].length - p.sideStacks[a.source.idx].length;
+    }
+    return 0;
+  });
   return candidates[0];
 }
 
