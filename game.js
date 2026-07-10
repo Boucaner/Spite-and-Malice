@@ -188,13 +188,52 @@ function endTurn() {
 
 // ── AI decision-making ───────────────────────────────────────────────────────
 
-// Prefer continuing the most-advanced stack so completed stacks recycle sooner.
-function pickBestTarget(targets) {
-  return targets.reduce((best, t) =>
-    state.centerStacks[t].length > state.centerStacks[best].length ? t : best, targets[0]);
+// Prefer continuing the most-advanced stack so completed stacks recycle sooner,
+// but avoid a target that would hand another player the win outright (see
+// wouldEnableOpponentWin) whenever a different legal target dodges that.
+function pickBestTarget(playerIdx, targets) {
+  const safe = targets.filter(t => !wouldEnableOpponentWin(playerIdx, t, state.centerStacks[t].length + 1));
+  const pool = safe.length ? safe : targets;
+  return pool.reduce((best, t) =>
+    state.centerStacks[t].length > state.centerStacks[best].length ? t : best, pool[0]);
 }
 
-// Returns the best available play for playerIdx, or null if none exists.
+// Would growing centerStacks[stackIdx] to newLen cards let some OTHER active
+// player empty their goal pile this turn, using only cards already visible
+// to every player (their goal-pile top and side-stack tops, chained through
+// the center stacks)? Only their exposed cards are considered -- never their
+// hand, which is hidden information in the real game.
+function wouldEnableOpponentWin(playerIdx, stackIdx, newLen) {
+  const lens = state.centerStacks.map((s, i) => (i === stackIdx ? newLen : s.length));
+
+  return state.players.some((opp, oppIdx) => {
+    if (oppIdx === playerIdx || opp.finished || opp.goalPile.length !== 1) return false;
+    const goalCard = topOf(opp.goalPile);
+
+    const workingLens = lens.slice();
+    const used = new Array(opp.sideStacks.length).fill(false);
+    let progressed = true;
+    while (progressed) {
+      progressed = false;
+      for (let i = 0; i < opp.sideStacks.length; i++) {
+        if (used[i] || opp.sideStacks[i].length === 0) continue;
+        const card = topOf(opp.sideStacks[i]);
+        const idx = workingLens.findIndex(len => matchesCenterPos(card, len));
+        if (idx !== -1) {
+          workingLens[idx]++;
+          used[i] = true;
+          progressed = true;
+        }
+      }
+    }
+
+    return workingLens.some(len => matchesCenterPos(goalCard, len));
+  });
+}
+
+// Returns the best available play for playerIdx, or null if none exists --
+// including the case where every legal play would hand another player the
+// win, in which case the AI deliberately holds back and just discards.
 function computeAiPlay(playerIdx) {
   const p = state.players[playerIdx];
   const candidates = [];
@@ -202,7 +241,7 @@ function computeAiPlay(playerIdx) {
   if (p.goalPile.length > 0) {
     const card = topOf(p.goalPile);
     const targets = legalCenterTargets(card);
-    if (targets.length) candidates.push({ priority: 0, source: { type: 'goal' }, stackIdx: pickBestTarget(targets) });
+    if (targets.length) candidates.push({ priority: 0, source: { type: 'goal' }, stackIdx: pickBestTarget(playerIdx, targets) });
   }
 
   // After the goal pile, clearing side stacks outranks the hand -- freeing a
@@ -213,19 +252,19 @@ function computeAiPlay(playerIdx) {
     if (s.length === 0) return;
     const card = topOf(s);
     const targets = legalCenterTargets(card);
-    if (targets.length) candidates.push({ priority: 1, source: { type: 'side', idx }, stackIdx: pickBestTarget(targets) });
+    if (targets.length) candidates.push({ priority: 1, source: { type: 'side', idx }, stackIdx: pickBestTarget(playerIdx, targets) });
   });
 
   p.hand.forEach(card => {
     if (isWild(card)) return;
     const targets = legalCenterTargets(card);
-    if (targets.length) candidates.push({ priority: 2, source: { type: 'hand', cardId: card.id }, stackIdx: pickBestTarget(targets) });
+    if (targets.length) candidates.push({ priority: 2, source: { type: 'hand', cardId: card.id }, stackIdx: pickBestTarget(playerIdx, targets) });
   });
 
   p.hand.forEach(card => {
     if (!isWild(card)) return;
     const targets = legalCenterTargets(card);
-    if (targets.length) candidates.push({ priority: 3, source: { type: 'hand', cardId: card.id }, stackIdx: pickBestTarget(targets) });
+    if (targets.length) candidates.push({ priority: 3, source: { type: 'hand', cardId: card.id }, stackIdx: pickBestTarget(playerIdx, targets) });
   });
 
   if (!candidates.length) return null;
@@ -237,7 +276,13 @@ function computeAiPlay(playerIdx) {
     }
     return 0;
   });
-  return candidates[0];
+
+  // Finishing our own goal pile ends the game immediately, so it's always
+  // safe regardless of what it would otherwise expose.
+  if (candidates[0].source.type === 'goal' && p.goalPile.length === 1) return candidates[0];
+
+  const safe = candidates.filter(c => !wouldEnableOpponentWin(playerIdx, c.stackIdx, state.centerStacks[c.stackIdx].length + 1));
+  return safe.length ? safe[0] : null;
 }
 
 const SIDE_STACK_RANK_VALUE = { A: 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, J: 11, Q: 12, K: 13 };
