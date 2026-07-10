@@ -41,6 +41,11 @@ $('btn-settings').addEventListener('click', () => {
   $('setting-game-name').value = state.settings.gameName;
   $('setting-players').value = String(state.settings.numPlayers);
   $('setting-ai-speed').value = String(state.settings.aiDelay);
+  $('setting-your-name').value = state.settings.humanName || '';
+  for (let i = 1; i <= 3; i++) {
+    $(`ai-name-${i}`).value = state.settings.aiNames[i - 1] || '';
+  }
+  syncCardBackPicker();
   elModalSettings.classList.remove('hidden');
 });
 
@@ -50,8 +55,32 @@ $('btn-settings-apply').addEventListener('click', () => {
   const gameName = $('setting-game-name').value.trim() || 'Spite and Malice';
   const numPlayers = parseInt($('setting-players').value, 10);
   const aiDelay = parseInt($('setting-ai-speed').value, 10);
+  const humanName = $('setting-your-name').value.trim() || 'You';
+  const aiNames = [1, 2, 3].map(i => $(`ai-name-${i}`).value.trim() || DEFAULT_AI_NAMES[i - 1]);
+  const cardBack = state.settings.cardBack;
+
+  localStorage.setItem('spiteMaliceGameName', JSON.stringify(gameName));
+  localStorage.setItem('spiteMaliceHumanName', JSON.stringify(humanName));
+  localStorage.setItem('spiteMaliceAiNames', JSON.stringify(aiNames));
+
   elModalSettings.classList.add('hidden');
-  bootGame({ gameName, numPlayers, aiDelay });
+  bootGame({ gameName, numPlayers, aiDelay, humanName, aiNames, cardBack });
+});
+
+function syncCardBackPicker() {
+  const val = state.settings.cardBack || 'blue';
+  document.querySelectorAll('#cb-picker-settings .cb-swatch').forEach(s => {
+    s.classList.toggle('active', s.dataset.value === val);
+  });
+}
+
+document.querySelectorAll('#cb-picker-settings .cb-swatch').forEach(swatch => {
+  swatch.addEventListener('click', () => {
+    state.settings.cardBack = swatch.dataset.value;
+    localStorage.setItem('spiteMaliceCardBack', JSON.stringify(swatch.dataset.value));
+    syncCardBackPicker();
+    render();
+  });
 });
 
 $('btn-gameover-newgame').addEventListener('click', () => bootGame(state.settings));
@@ -209,7 +238,7 @@ function renderOpponents() {
       goalWrap.appendChild(top);
     } else {
       const empty = document.createElement('div');
-      empty.className = 'card-back mini-card';
+      empty.className = `card-back card-back--${state.settings.cardBack || 'blue'} mini-card`;
       empty.style.opacity = '0.2';
       goalWrap.appendChild(empty);
     }
@@ -238,7 +267,7 @@ function renderCenter() {
   elStockPile.innerHTML = '';
   if (state.stock.length > 0) {
     const back = document.createElement('div');
-    back.className = 'card-back count-badge';
+    back.className = `card-back card-back--${state.settings.cardBack || 'blue'} count-badge`;
     back.dataset.count = state.stock.length;
     elStockPile.appendChild(back);
   } else {
@@ -278,7 +307,7 @@ function renderPlayerZone() {
   const myTurn = isHumanTurn();
   const humanIdx = state.players.indexOf(human);
 
-  elPlayerName.textContent = human.finished ? 'You — WINNER' : 'You';
+  elPlayerName.textContent = human.finished ? `${human.name} — WINNER` : human.name;
   elTurnIndicator.classList.toggle('hidden', !myTurn);
 
   // Goal pile

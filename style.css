@@ -262,6 +262,39 @@ html, body {
   color: #ffffffcc;
 }
 
+/* Card-back colour variants */
+.card-back--blue  { background: repeating-linear-gradient(135deg, #1a237e 0px, #1a237e 8px, #283593 8px, #283593 16px); border-color: rgba(255,255,255,0.18); }
+.card-back--red   { background: repeating-linear-gradient(135deg, #7f1d1d 0px, #7f1d1d 8px, #991b1b 8px, #991b1b 16px); border-color: rgba(255,255,255,0.18); }
+.card-back--green { background: repeating-linear-gradient(135deg, #14532d 0px, #14532d 8px, #166534 8px, #166534 16px); border-color: rgba(255,255,255,0.18); }
+.card-back--dark  { background: repeating-linear-gradient(135deg, #0f172a 0px, #0f172a 8px, #1e293b 8px, #1e293b 16px); border-color: rgba(255,255,255,0.12); }
+.card-back--gold  { background: repeating-linear-gradient(135deg, #78350f 0px, #78350f 8px, #9a3412 8px, #9a3412 16px); border-color: rgba(251,191,36,0.3); }
+
+/* Card-back picker (settings modal) */
+.cb-picker {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+.cb-swatch {
+  width: 28px;
+  height: 40px;
+  border-radius: 4px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  position: relative;
+  transition: transform .1s;
+  box-shadow: 0 2px 6px rgba(0,0,0,.5);
+}
+.cb-swatch::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 2px;
+}
+.cb-swatch:hover { transform: translateY(-2px); }
+.cb-swatch.active { border-color: var(--gold); box-shadow: 0 0 8px rgba(244,208,63,.55); }
+
 /* ── Cards ────────────────────────────────────────────────── */
 .card {
   width: var(--card-w);
@@ -438,6 +471,37 @@ html, body {
   border-radius: 6px;
   font-size: .9rem;
 }
+
+.names-section { display: flex; flex-direction: column; gap: 4px; }
+.names-heading {
+  font-size: .85rem;
+  color: #aaa;
+  margin-bottom: 2px;
+}
+#names-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.name-row {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 6px !important;
+  font-size: .8rem !important;
+  color: #999 !important;
+  white-space: nowrap;
+}
+.name-row input[type="text"] {
+  flex: 1;
+  background: #2a2a2e;
+  border: 1px solid #444;
+  color: #eee;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: .85rem;
+  min-width: 0;
+}
+.name-row input[type="text"]:focus { outline: none; border-color: var(--gold); }
 
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
 .modal-actions button {

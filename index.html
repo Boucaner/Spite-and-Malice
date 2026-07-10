@@ -83,6 +83,25 @@
           <option value="300">Fast</option>
         </select>
       </label>
+      <label>
+        Card back
+        <div class="cb-picker" id="cb-picker-settings">
+          <div class="cb-swatch card-back--blue"  data-value="blue"  title="Blue"></div>
+          <div class="cb-swatch card-back--red"   data-value="red"   title="Red"></div>
+          <div class="cb-swatch card-back--green" data-value="green" title="Green"></div>
+          <div class="cb-swatch card-back--dark"  data-value="dark"  title="Dark"></div>
+          <div class="cb-swatch card-back--gold"  data-value="gold"  title="Gold"></div>
+        </div>
+      </label>
+      <div class="names-section">
+        <div class="names-heading">Player Names</div>
+        <div id="names-grid">
+          <label class="name-row">You<input type="text" id="setting-your-name" maxlength="16" placeholder="You"></label>
+          <label class="name-row">AI 1<input type="text" id="ai-name-1" maxlength="16" placeholder="Alice"></label>
+          <label class="name-row">AI 2<input type="text" id="ai-name-2" maxlength="16" placeholder="Bob"></label>
+          <label class="name-row">AI 3<input type="text" id="ai-name-3" maxlength="16" placeholder="Carlos"></label>
+        </div>
+      </div>
       <div class="modal-actions">
         <button id="btn-settings-close">Close</button>
         <button id="btn-settings-apply" class="primary">Apply &amp; New Game</button>

@@ -6,6 +6,14 @@ const HAND_SIZE = 5;
 const SIDE_STACK_COUNT = 4;
 const CENTER_STACK_COUNT = 4;
 
+function loadStored(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === null) return fallback;
+    return JSON.parse(raw);
+  } catch { return fallback; }
+}
+
 const state = {
   players: [],        // { name, isHuman, goalPile:[], sideStacks:[[],[],[],[]], hand:[], finished }
   centerStacks: [],    // 4 slots, each an array of cards played in sequence (A..Q)
@@ -16,8 +24,10 @@ const state = {
   winner: null,
   settings: {
     numPlayers: 2,
-    aiNames: [...DEFAULT_AI_NAMES],
-    gameName: 'Spite and Malice',
+    humanName: loadStored('spiteMaliceHumanName', 'You'),
+    aiNames: loadStored('spiteMaliceAiNames', [...DEFAULT_AI_NAMES]),
+    gameName: loadStored('spiteMaliceGameName', 'Spite and Malice'),
+    cardBack: loadStored('spiteMaliceCardBack', 'blue'),
     aiDelay: 700,
   },
 };
@@ -37,7 +47,7 @@ function newGame(settings) {
   state.players = [];
   for (let i = 0; i < numPlayers; i++) {
     state.players.push({
-      name: i === 0 ? 'You' : (state.settings.aiNames[i - 1] || `AI ${i}`),
+      name: i === 0 ? (state.settings.humanName || 'You') : (state.settings.aiNames[i - 1] || DEFAULT_AI_NAMES[i - 1] || `AI ${i}`),
       isHuman: i === 0,
       goalPile: deck.splice(0, GOAL_PILE_SIZE),
       sideStacks: Array.from({ length: SIDE_STACK_COUNT }, () => []),
