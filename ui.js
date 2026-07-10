@@ -249,19 +249,7 @@ function renderOpponents() {
     goalWrap.appendChild(goalLabel);
     pilesRow.appendChild(goalWrap);
 
-    const sideWrap = document.createElement('div');
-    sideWrap.className = 'opponent-side-stacks';
-    p.sideStacks.forEach((stack, sIdx) => {
-      const wrap = buildStackPreviewEl(stack, { mini: true });
-      if (stack.length > STACK_PREVIEW_COUNT) {
-        wrap.addEventListener('click', () => {
-          openPileView(stack, { title: `${p.name} — Side Stack ${sIdx + 1}` });
-        });
-      }
-      sideWrap.appendChild(wrap);
-    });
-    pilesRow.appendChild(sideWrap);
-
+    // Opponents' side stacks are intentionally hidden from the human player.
     seat.appendChild(pilesRow);
     elOpponentsRow.appendChild(seat);
   });
