@@ -1,6 +1,7 @@
 // ── Game state ────────────────────────────────────────────────────────────────
 
-const DEFAULT_AI_NAMES = ['Emma', 'Kate', 'Jack', 'Andrew'];
+const DEFAULT_HUMAN_NAME = 'Emma';
+const DEFAULT_AI_NAMES = ['Kate', 'Jack', 'Andrew'];
 const DEFAULT_GOAL_PILE_SIZE = 20;
 const MIN_GOAL_PILE_SIZE = 12;
 const MAX_GOAL_PILE_SIZE = 26;
@@ -26,7 +27,7 @@ const state = {
   winner: null,
   settings: {
     numPlayers: 2,
-    humanName: loadStored('spiteMaliceHumanName', 'You'),
+    humanName: loadStored('spiteMaliceHumanName', DEFAULT_HUMAN_NAME),
     aiNames: loadStored('spiteMaliceAiNames', [...DEFAULT_AI_NAMES]),
     gameName: loadStored('spiteMaliceGameName', 'Spite and Malice'),
     cardBack: loadStored('spiteMaliceCardBack', 'blue'),

@@ -56,7 +56,7 @@ $('btn-settings-apply').addEventListener('click', () => {
   const gameName = $('setting-game-name').value.trim() || 'Spite and Malice';
   const numPlayers = parseInt($('setting-players').value, 10);
   const aiDelay = parseInt($('setting-ai-speed').value, 10);
-  const humanName = $('setting-your-name').value.trim() || 'You';
+  const humanName = $('setting-your-name').value.trim() || DEFAULT_HUMAN_NAME;
   const aiNames = [1, 2, 3].map(i => $(`ai-name-${i}`).value.trim() || DEFAULT_AI_NAMES[i - 1]);
   const cardBack = state.settings.cardBack;
   const goalPileSizeRaw = parseInt($('setting-goal-pile-size').value, 10);
@@ -320,7 +320,7 @@ function renderPlayerZone() {
   const myTurn = isHumanTurn();
   const humanIdx = state.players.indexOf(human);
 
-  elPlayerName.textContent = human.finished ? `${human.name} — WINNER` : human.name;
+  elPlayerName.textContent = human.finished ? 'You — WINNER' : 'You';
   elTurnIndicator.classList.toggle('hidden', !myTurn);
 
   // Goal pile
