@@ -1,7 +1,9 @@
 // ── Game state ────────────────────────────────────────────────────────────────
 
 const DEFAULT_AI_NAMES = ['Emma', 'Kate', 'Andrew', 'Jack'];
-const GOAL_PILE_SIZE = 20;
+const DEFAULT_GOAL_PILE_SIZE = 20;
+const MIN_GOAL_PILE_SIZE = 12;
+const MAX_GOAL_PILE_SIZE = 26;
 const HAND_SIZE = 5;
 const SIDE_STACK_COUNT = 4;
 const CENTER_STACK_COUNT = 4;
@@ -28,6 +30,7 @@ const state = {
     aiNames: loadStored('spiteMaliceAiNames', [...DEFAULT_AI_NAMES]),
     gameName: loadStored('spiteMaliceGameName', 'Spite and Malice'),
     cardBack: loadStored('spiteMaliceCardBack', 'blue'),
+    goalPileSize: loadStored('spiteMaliceGoalPileSize', DEFAULT_GOAL_PILE_SIZE),
     aiDelay: 1000,
   },
 };
@@ -41,6 +44,8 @@ function topOf(pile) {
 function newGame(settings) {
   state.settings = { ...state.settings, ...settings };
   const numPlayers = state.settings.numPlayers;
+  const goalPileSize = Math.min(MAX_GOAL_PILE_SIZE, Math.max(MIN_GOAL_PILE_SIZE, state.settings.goalPileSize || DEFAULT_GOAL_PILE_SIZE));
+  state.settings.goalPileSize = goalPileSize;
 
   let deck = shuffle(buildDeck(numPlayers)); // 1 deck per player keeps the card pool comfortable
 
@@ -49,7 +54,7 @@ function newGame(settings) {
     state.players.push({
       name: i === 0 ? (state.settings.humanName || 'You') : (state.settings.aiNames[i - 1] || DEFAULT_AI_NAMES[i - 1] || `AI ${i}`),
       isHuman: i === 0,
-      goalPile: deck.splice(0, GOAL_PILE_SIZE),
+      goalPile: deck.splice(0, goalPileSize),
       sideStacks: Array.from({ length: SIDE_STACK_COUNT }, () => []),
       hand: [],
       finished: false,
@@ -71,8 +76,9 @@ function newGame(settings) {
 function determineFirstPlayer() {
   let candidates = state.players.map((_, i) => i);
   let depth = 1;
+  const maxDepth = state.players[0].goalPile.length;
 
-  while (candidates.length > 1 && depth <= GOAL_PILE_SIZE) {
+  while (candidates.length > 1 && depth <= maxDepth) {
     let best = -1;
     let bestRank = -1;
     let tied = [];

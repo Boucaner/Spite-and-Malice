@@ -42,6 +42,7 @@ $('btn-settings').addEventListener('click', () => {
   $('setting-players').value = String(state.settings.numPlayers);
   $('setting-ai-speed').value = String(state.settings.aiDelay);
   $('setting-your-name').value = state.settings.humanName || '';
+  $('setting-goal-pile-size').value = String(state.settings.goalPileSize);
   for (let i = 1; i <= 3; i++) {
     $(`ai-name-${i}`).value = state.settings.aiNames[i - 1] || '';
   }
@@ -58,13 +59,16 @@ $('btn-settings-apply').addEventListener('click', () => {
   const humanName = $('setting-your-name').value.trim() || 'You';
   const aiNames = [1, 2, 3].map(i => $(`ai-name-${i}`).value.trim() || DEFAULT_AI_NAMES[i - 1]);
   const cardBack = state.settings.cardBack;
+  const goalPileSizeRaw = parseInt($('setting-goal-pile-size').value, 10);
+  const goalPileSize = Math.min(26, Math.max(12, isNaN(goalPileSizeRaw) ? 20 : goalPileSizeRaw));
 
   localStorage.setItem('spiteMaliceGameName', JSON.stringify(gameName));
   localStorage.setItem('spiteMaliceHumanName', JSON.stringify(humanName));
   localStorage.setItem('spiteMaliceAiNames', JSON.stringify(aiNames));
+  localStorage.setItem('spiteMaliceGoalPileSize', JSON.stringify(goalPileSize));
 
   elModalSettings.classList.add('hidden');
-  bootGame({ gameName, numPlayers, aiDelay, humanName, aiNames, cardBack });
+  bootGame({ gameName, numPlayers, aiDelay, humanName, aiNames, cardBack, goalPileSize });
 });
 
 function syncCardBackPicker() {
@@ -354,7 +358,7 @@ function renderPlayerZone() {
 
     if (handSelected) wrap.classList.add('valid-target');
     wrap.addEventListener('click', () => {
-      if (stack.length > STACK_PREVIEW_COUNT) {
+      if (!handSelected && stack.length > STACK_PREVIEW_COUNT) {
         openPileView(stack, { title: `Side Stack ${idx + 1}`, interactiveTop: myTurn, onTopClick: doAction });
       } else {
         doAction();
