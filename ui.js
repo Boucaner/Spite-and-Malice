@@ -288,12 +288,21 @@ function renderCenter() {
       el.className = 'center-stack-slot stack-slot-empty';
       el.innerHTML = '<span class="stack-slot-ghost">A</span>';
     } else {
-      el = buildCardEl(topOf(stack), false);
+      const topCard = topOf(stack);
+      el = buildCardEl(topCard, false);
       el.classList.add('center-stack-slot');
       const badge = document.createElement('span');
       badge.className = 'stack-slot-count';
       badge.textContent = stack.length;
       el.appendChild(badge);
+
+      if (isWild(topCard)) {
+        const wildLabel = document.createElement('span');
+        wildLabel.className = 'wild-represents';
+        wildLabel.textContent = RANK_SEQ[stack.length - 1];
+        wildLabel.title = `This King is standing in for a ${RANK_SEQ[stack.length - 1]}`;
+        el.appendChild(wildLabel);
+      }
     }
     if (centerTargets.includes(idx)) el.classList.add('valid-target');
     el.addEventListener('click', () => onCenterSlotClick(idx));
