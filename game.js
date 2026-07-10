@@ -1,6 +1,6 @@
 // ── Game state ────────────────────────────────────────────────────────────────
 
-const DEFAULT_AI_NAMES = ['Emma', 'Kate', 'Andrew', 'Jack'];
+const DEFAULT_AI_NAMES = ['Emma', 'Kate', 'Jack', 'Andrew'];
 const DEFAULT_GOAL_PILE_SIZE = 20;
 const MIN_GOAL_PILE_SIZE = 12;
 const MAX_GOAL_PILE_SIZE = 26;
