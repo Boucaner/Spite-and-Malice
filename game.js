@@ -188,28 +188,38 @@ function endTurn() {
 
 // ── AI decision-making ───────────────────────────────────────────────────────
 
-// Prefer continuing the most-advanced stack so completed stacks recycle sooner,
-// but avoid a target that would hand another player the win outright (see
-// wouldEnableOpponentWin) whenever a different legal target dodges that.
-function pickBestTarget(playerIdx, targets) {
-  const safe = targets.filter(t => !wouldEnableOpponentWin(playerIdx, t, state.centerStacks[t].length + 1));
-  const pool = safe.length ? safe : targets;
-  return pool.reduce((best, t) =>
-    state.centerStacks[t].length > state.centerStacks[best].length ? t : best, pool[0]);
+// How urgent it is to avoid exposing an opponent's current goal-pile card,
+// keyed by how many cards are left in their goal pile. 3 = they'd very
+// likely win outright on their next turn; 0 = far enough out not to matter.
+function baseExposureUrgency(goalPileLength) {
+  if (goalPileLength === 1) return 3;
+  if (goalPileLength === 2) return 2;
+  if (goalPileLength <= 4) return 1;
+  return 0;
 }
 
-// Would growing centerStacks[stackIdx] to newLen cards let some OTHER active
-// player empty their goal pile this turn, using only cards already visible
-// to every player (their goal-pile top and side-stack tops, chained through
-// the center stacks)? Only their exposed cards are considered -- never their
-// hand, which is hidden information in the real game.
-function wouldEnableOpponentWin(playerIdx, stackIdx, newLen) {
+// If we're already this far behind a threatened opponent, playing defense
+// against them costs tempo we can't spare -- they'll likely find another
+// opening soon regardless, so there's little point sacrificing our own
+// plays to delay them. Ease off by a tier instead.
+const DESPERATION_GAP = 6;
+
+// Worst-case urgency (0-3) of growing centerStacks[stackIdx] to newLen,
+// across every active opponent it would expose -- using only cards already
+// visible to every player (their goal-pile top and side-stack tops, chained
+// through the center stacks). Never their hand, which is hidden information
+// in the real game.
+function worstExposureUrgency(playerIdx, stackIdx, newLen) {
   const lens = state.centerStacks.map((s, i) => (i === stackIdx ? newLen : s.length));
+  const self = state.players[playerIdx];
+  let worst = 0;
 
-  return state.players.some((opp, oppIdx) => {
-    if (oppIdx === playerIdx || opp.finished || opp.goalPile.length !== 1) return false;
+  state.players.forEach((opp, oppIdx) => {
+    if (oppIdx === playerIdx || opp.finished || opp.goalPile.length === 0) return;
+    const baseUrgency = baseExposureUrgency(opp.goalPile.length);
+    if (baseUrgency === 0) return;
+
     const goalCard = topOf(opp.goalPile);
-
     const workingLens = lens.slice();
     const used = new Array(opp.sideStacks.length).fill(false);
     let progressed = true;
@@ -226,14 +236,46 @@ function wouldEnableOpponentWin(playerIdx, stackIdx, newLen) {
         }
       }
     }
+    if (!workingLens.some(len => matchesCenterPos(goalCard, len))) return;
 
-    return workingLens.some(len => matchesCenterPos(goalCard, len));
+    const urgency = self.goalPile.length - opp.goalPile.length >= DESPERATION_GAP ? baseUrgency - 1 : baseUrgency;
+    worst = Math.max(worst, urgency);
   });
+
+  return worst;
+}
+
+// Urgency of playing `source` onto centerStacks[stackIdx] (growing it to
+// newLen). Goal-pile plays get a trade offset: if removing our own top goal
+// card immediately hands us a legal play for the card beneath it, exposing
+// an opponent is far more acceptable since we get something concrete back
+// the same turn.
+function playUrgency(playerIdx, source, stackIdx, newLen) {
+  const urgency = worstExposureUrgency(playerIdx, stackIdx, newLen);
+  if (urgency === 0 || source.type !== 'goal') return urgency;
+
+  const p = state.players[playerIdx];
+  const nextCard = p.goalPile[p.goalPile.length - 2];
+  if (!nextCard) return urgency;
+
+  const lens = state.centerStacks.map((s, i) => (i === stackIdx ? newLen : s.length));
+  return lens.some(len => matchesCenterPos(nextCard, len)) ? Math.max(0, urgency - 2) : urgency;
+}
+
+// Prefer continuing the most-advanced stack so completed stacks recycle
+// sooner, but steer away from targets with higher exposure urgency (see
+// playUrgency) whenever a less risky legal target is available.
+function pickBestTarget(playerIdx, source, targets) {
+  const urgencies = targets.map(t => playUrgency(playerIdx, source, t, state.centerStacks[t].length + 1));
+  const minUrgency = Math.min(...urgencies);
+  const pool = targets.filter((t, i) => urgencies[i] === minUrgency);
+  return pool.reduce((best, t) =>
+    state.centerStacks[t].length > state.centerStacks[best].length ? t : best, pool[0]);
 }
 
 // Returns the best available play for playerIdx, or null if none exists --
-// including the case where every legal play would hand another player the
-// win, in which case the AI deliberately holds back and just discards.
+// including the case where every legal play is too dangerous to make (see
+// playUrgency), in which case the AI deliberately holds back and just discards.
 function computeAiPlay(playerIdx) {
   const p = state.players[playerIdx];
   const candidates = [];
@@ -241,7 +283,7 @@ function computeAiPlay(playerIdx) {
   if (p.goalPile.length > 0) {
     const card = topOf(p.goalPile);
     const targets = legalCenterTargets(card);
-    if (targets.length) candidates.push({ priority: 0, source: { type: 'goal' }, stackIdx: pickBestTarget(playerIdx, targets) });
+    if (targets.length) candidates.push({ priority: 0, source: { type: 'goal' }, stackIdx: pickBestTarget(playerIdx, { type: 'goal' }, targets) });
   }
 
   // After the goal pile, clearing side stacks outranks the hand -- freeing a
@@ -252,19 +294,19 @@ function computeAiPlay(playerIdx) {
     if (s.length === 0) return;
     const card = topOf(s);
     const targets = legalCenterTargets(card);
-    if (targets.length) candidates.push({ priority: 1, source: { type: 'side', idx }, stackIdx: pickBestTarget(playerIdx, targets) });
+    if (targets.length) candidates.push({ priority: 1, source: { type: 'side', idx }, stackIdx: pickBestTarget(playerIdx, { type: 'side', idx }, targets) });
   });
 
   p.hand.forEach(card => {
     if (isWild(card)) return;
     const targets = legalCenterTargets(card);
-    if (targets.length) candidates.push({ priority: 2, source: { type: 'hand', cardId: card.id }, stackIdx: pickBestTarget(playerIdx, targets) });
+    if (targets.length) candidates.push({ priority: 2, source: { type: 'hand', cardId: card.id }, stackIdx: pickBestTarget(playerIdx, { type: 'hand', cardId: card.id }, targets) });
   });
 
   p.hand.forEach(card => {
     if (!isWild(card)) return;
     const targets = legalCenterTargets(card);
-    if (targets.length) candidates.push({ priority: 3, source: { type: 'hand', cardId: card.id }, stackIdx: pickBestTarget(playerIdx, targets) });
+    if (targets.length) candidates.push({ priority: 3, source: { type: 'hand', cardId: card.id }, stackIdx: pickBestTarget(playerIdx, { type: 'hand', cardId: card.id }, targets) });
   });
 
   if (!candidates.length) return null;
@@ -281,8 +323,14 @@ function computeAiPlay(playerIdx) {
   // safe regardless of what it would otherwise expose.
   if (candidates[0].source.type === 'goal' && p.goalPile.length === 1) return candidates[0];
 
-  const safe = candidates.filter(c => !wouldEnableOpponentWin(playerIdx, c.stackIdx, state.centerStacks[c.stackIdx].length + 1));
-  return safe.length ? safe[0] : null;
+  // Rule out only the critical-urgency plays (tier 3 -- an opponent who'd
+  // very likely win outright next turn); anything milder is an acceptable
+  // trade-off, not a reason to skip a play. If every candidate is that
+  // dangerous, we deliberately pass on playing this cycle -- unless
+  // worstExposureUrgency has already discounted it for desperation, in
+  // which case it won't reach tier 3 and we'll take it below.
+  const acceptable = candidates.filter(c => playUrgency(playerIdx, c.source, c.stackIdx, state.centerStacks[c.stackIdx].length + 1) < 3);
+  return acceptable.length ? acceptable[0] : null;
 }
 
 const SIDE_STACK_RANK_VALUE = { A: 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, J: 11, Q: 12, K: 13 };
