@@ -251,6 +251,8 @@ function worstExposureUrgency(playerIdx, stackIdx, newLen) {
 // an opponent is far more acceptable since we get something concrete back
 // the same turn.
 function playUrgency(playerIdx, source, stackIdx, newLen) {
+  if (setsUpImmediateWin(playerIdx, source, newLen)) return 0;
+
   const urgency = worstExposureUrgency(playerIdx, stackIdx, newLen);
   if (urgency === 0 || source.type !== 'goal') return urgency;
 
@@ -262,15 +264,42 @@ function playUrgency(playerIdx, source, stackIdx, newLen) {
   return lens.some(len => matchesCenterPos(nextCard, len)) ? Math.max(0, urgency - 2) : urgency;
 }
 
+// Would playing `source` onto centerStacks[stackIdx] (growing it to newLen)
+// immediately open a legal spot for our own current goal-pile card? A card
+// with several legal targets -- most notably a wild King -- should chain
+// into our own goal pile whenever it can, since advancing the goal pile is
+// how we actually win; that always outranks generic "extend the tallest
+// stack" tie-breaking.
+function enablesOwnGoalFollowUp(playerIdx, source, newLen) {
+  if (source.type === 'goal') return false;
+  const goalCard = topOf(state.players[playerIdx].goalPile);
+  return goalCard != null && matchesCenterPos(goalCard, newLen);
+}
+
+// If our goal pile is down to its last card, does playing `source` onto
+// centerStacks[stackIdx] set up an immediate win -- i.e. will that final
+// goal card now have a legal target? If so the game ends on our very next
+// move this same turn, before any opponent gets a turn to exploit whatever
+// this exposed, so ordinary exposure-risk checks don't apply.
+function setsUpImmediateWin(playerIdx, source, newLen) {
+  const p = state.players[playerIdx];
+  return source.type !== 'goal' && p.goalPile.length === 1 && matchesCenterPos(topOf(p.goalPile), newLen);
+}
+
 // Prefer continuing the most-advanced stack so completed stacks recycle
 // sooner, but steer away from targets with higher exposure urgency (see
-// playUrgency) whenever a less risky legal target is available.
+// playUrgency) whenever a less risky legal target is available, and prefer
+// a target that chains into our own goal pile over either of those.
 function pickBestTarget(playerIdx, source, targets) {
   const urgencies = targets.map(t => playUrgency(playerIdx, source, t, state.centerStacks[t].length + 1));
   const minUrgency = Math.min(...urgencies);
   const pool = targets.filter((t, i) => urgencies[i] === minUrgency);
-  return pool.reduce((best, t) =>
-    state.centerStacks[t].length > state.centerStacks[best].length ? t : best, pool[0]);
+
+  const chaining = pool.filter(t => enablesOwnGoalFollowUp(playerIdx, source, state.centerStacks[t].length + 1));
+  const finalPool = chaining.length ? chaining : pool;
+
+  return finalPool.reduce((best, t) =>
+    state.centerStacks[t].length > state.centerStacks[best].length ? t : best, finalPool[0]);
 }
 
 // Returns the best available play for playerIdx, or null if none exists --
@@ -310,6 +339,18 @@ function computeAiPlay(playerIdx) {
   });
 
   if (!candidates.length) return null;
+
+  // Finishing our goal pile -- or setting up an unstoppable follow-up that
+  // will finish it on the very next iteration this same turn (see
+  // setsUpImmediateWin) -- ends the game before any opponent gets another
+  // turn. That overrides normal source-type priority and safety checks, so
+  // a wild King setting up the win beats a mundane side-stack play every
+  // time, not just when the goal card already happens to sort first.
+  const winningPlay = candidates.find(c =>
+    (c.source.type === 'goal' && p.goalPile.length === 1) ||
+    setsUpImmediateWin(playerIdx, c.source, state.centerStacks[c.stackIdx].length + 1));
+  if (winningPlay) return winningPlay;
+
   candidates.sort((a, b) => {
     if (a.priority !== b.priority) return a.priority - b.priority;
     // Among equally-ranked side-stack plays, clear the most-blocked (tallest) one first.
@@ -318,10 +359,6 @@ function computeAiPlay(playerIdx) {
     }
     return 0;
   });
-
-  // Finishing our own goal pile ends the game immediately, so it's always
-  // safe regardless of what it would otherwise expose.
-  if (candidates[0].source.type === 'goal' && p.goalPile.length === 1) return candidates[0];
 
   // Rule out only the critical-urgency plays (tier 3 -- an opponent who'd
   // very likely win outright next turn); anything milder is an acceptable
