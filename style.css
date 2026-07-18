@@ -348,7 +348,7 @@ html, body {
 .card.black .card-value, .card.black .card-suit { color: #111; }
 
 .card-value {
-  font-size: .9rem;
+  font-size: 1.15rem;
   font-weight: 700;
   line-height: 1;
 }
@@ -361,7 +361,7 @@ html, body {
 }
 
 .card-value-bottom {
-  font-size: .9rem;
+  font-size: 1.15rem;
   font-weight: 700;
   line-height: 1;
   align-self: flex-end;
