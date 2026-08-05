@@ -12,6 +12,7 @@ const elPlayerSideStacks = $('player-side-stacks');
 const elHand            = $('hand');
 const elStatusMsg       = $('status-msg');
 const elModalSettings   = $('modal-settings');
+const elModalRules      = $('modal-rules');
 const elModalGameOver   = $('modal-gameover');
 const elModalPileView   = $('modal-pile-view');
 
@@ -34,6 +35,11 @@ function bootGame(settings) {
 document.addEventListener('DOMContentLoaded', () => bootGame({}));
 
 $('btn-new-game').addEventListener('click', () => bootGame(state.settings));
+
+// ── Rules modal ───────────────────────────────────────────────────────────────
+
+$('btn-rules').addEventListener('click', () => elModalRules.classList.remove('hidden'));
+$('btn-rules-close').addEventListener('click', () => elModalRules.classList.add('hidden'));
 
 // ── Settings modal ────────────────────────────────────────────────────────────
 

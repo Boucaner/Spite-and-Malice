@@ -492,6 +492,10 @@ html, body {
   font-size: .9rem;
 }
 
+.modal-box.rules-box { max-width: 560px; max-height: 82vh; overflow-y: auto; }
+.rules-section h3 { color: var(--gold); font-size: .95rem; margin: 0 0 4px; }
+.rules-section p { color: #ccc; font-size: .85rem; line-height: 1.5; margin: 0; }
+
 .names-section { display: flex; flex-direction: column; gap: 4px; }
 .names-heading {
   font-size: .85rem;
