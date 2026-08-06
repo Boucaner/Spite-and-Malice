@@ -142,6 +142,16 @@ function checkStackCompletion(stackIdx) {
   }
 }
 
+// The real post-play length of a stack after adding one card: 0 if this
+// completes it, since checkStackCompletion immediately clears a finished
+// stack away. AI risk/lookahead code must use this instead of a raw +1, or
+// it ends up predicting exposure against a length-12 state that can never
+// actually exist.
+function afterPlayLen(currentLen) {
+  const next = currentLen + 1;
+  return next === STACK_LENGTH ? 0 : next;
+}
+
 // source: { type: 'goal' } | { type: 'side', idx } | { type: 'hand', cardId }
 function playToCenter(playerIdx, source, stackIdx) {
   const card = getSourceCard(playerIdx, source);
@@ -220,25 +230,44 @@ function worstExposureUrgency(playerIdx, stackIdx, newLen) {
     if (baseUrgency === 0) return;
 
     const goalCard = topOf(opp.goalPile);
-    const workingLens = lens.slice();
-    const used = new Array(opp.sideStacks.length).fill(false);
-    let progressed = true;
-    while (progressed) {
-      progressed = false;
-      for (let i = 0; i < opp.sideStacks.length; i++) {
-        if (used[i] || opp.sideStacks[i].length === 0) continue;
-        const card = topOf(opp.sideStacks[i]);
-        const idx = workingLens.findIndex(len => matchesCenterPos(card, len));
-        if (idx !== -1) {
-          workingLens[idx]++;
-          used[i] = true;
-          progressed = true;
+
+    // Check direct exposure -- does the goal card already fit one of these
+    // stacks with no chaining needed -- before simulating any side-stack
+    // chaining below. Otherwise a side-stack card of the same rank as the
+    // goal card (e.g. both are sixes) can spuriously "consume" the exact
+    // slot the goal card needs first, hiding a real, immediate win: the
+    // opponent would obviously play their winning goal card into that slot
+    // themselves, not waste it on a side card.
+    let exposed = lens.some(len => matchesCenterPos(goalCard, len));
+
+    if (!exposed) {
+      const workingLens = lens.slice();
+      const used = new Array(opp.sideStacks.length).fill(false);
+      let progressed = true;
+      while (progressed) {
+        progressed = false;
+        for (let i = 0; i < opp.sideStacks.length; i++) {
+          if (used[i] || opp.sideStacks[i].length === 0) continue;
+          const card = topOf(opp.sideStacks[i]);
+          const idx = workingLens.findIndex(len => matchesCenterPos(card, len));
+          if (idx !== -1) {
+            workingLens[idx]++;
+            used[i] = true;
+            progressed = true;
+          }
         }
       }
+      exposed = workingLens.some(len => matchesCenterPos(goalCard, len));
     }
-    if (!workingLens.some(len => matchesCenterPos(goalCard, len))) return;
 
-    const urgency = self.goalPile.length - opp.goalPile.length >= DESPERATION_GAP ? baseUrgency - 1 : baseUrgency;
+    if (!exposed) return;
+
+    // Never discount a tier-3 exposure: that means the opponent has exactly
+    // one goal card and this would hand them a certain, immediate win, not
+    // a probabilistic risk -- there's no "they'll find another opening
+    // anyway" argument to be made when the loss is guaranteed right now.
+    const desperate = baseUrgency < 3 && self.goalPile.length - opp.goalPile.length >= DESPERATION_GAP;
+    const urgency = desperate ? baseUrgency - 1 : baseUrgency;
     worst = Math.max(worst, urgency);
   });
 
@@ -254,7 +283,11 @@ function playUrgency(playerIdx, source, stackIdx, newLen) {
   if (setsUpImmediateWin(playerIdx, source, newLen)) return 0;
 
   const urgency = worstExposureUrgency(playerIdx, stackIdx, newLen);
-  if (urgency === 0 || source.type !== 'goal') return urgency;
+  // Same principle as the desperation discount above: a tier-3 urgency means
+  // a guaranteed win for whichever opponent is down to their last card, so
+  // the trade offset -- meant to make a probabilistic risk more acceptable
+  // in exchange for concrete progress -- must never apply to it.
+  if (urgency === 0 || urgency >= 3 || source.type !== 'goal') return urgency;
 
   const p = state.players[playerIdx];
   const nextCard = p.goalPile[p.goalPile.length - 2];
@@ -291,11 +324,11 @@ function setsUpImmediateWin(playerIdx, source, newLen) {
 // playUrgency) whenever a less risky legal target is available, and prefer
 // a target that chains into our own goal pile over either of those.
 function pickBestTarget(playerIdx, source, targets) {
-  const urgencies = targets.map(t => playUrgency(playerIdx, source, t, state.centerStacks[t].length + 1));
+  const urgencies = targets.map(t => playUrgency(playerIdx, source, t, afterPlayLen(state.centerStacks[t].length)));
   const minUrgency = Math.min(...urgencies);
   const pool = targets.filter((t, i) => urgencies[i] === minUrgency);
 
-  const chaining = pool.filter(t => enablesOwnGoalFollowUp(playerIdx, source, state.centerStacks[t].length + 1));
+  const chaining = pool.filter(t => enablesOwnGoalFollowUp(playerIdx, source, afterPlayLen(state.centerStacks[t].length)));
   const finalPool = chaining.length ? chaining : pool;
 
   return finalPool.reduce((best, t) =>
@@ -348,7 +381,7 @@ function computeAiPlay(playerIdx) {
   // time, not just when the goal card already happens to sort first.
   const winningPlay = candidates.find(c =>
     (c.source.type === 'goal' && p.goalPile.length === 1) ||
-    setsUpImmediateWin(playerIdx, c.source, state.centerStacks[c.stackIdx].length + 1));
+    setsUpImmediateWin(playerIdx, c.source, afterPlayLen(state.centerStacks[c.stackIdx].length)));
   if (winningPlay) return winningPlay;
 
   candidates.sort((a, b) => {
@@ -366,7 +399,7 @@ function computeAiPlay(playerIdx) {
   // dangerous, we deliberately pass on playing this cycle -- unless
   // worstExposureUrgency has already discounted it for desperation, in
   // which case it won't reach tier 3 and we'll take it below.
-  const acceptable = candidates.filter(c => playUrgency(playerIdx, c.source, c.stackIdx, state.centerStacks[c.stackIdx].length + 1) < 3);
+  const acceptable = candidates.filter(c => playUrgency(playerIdx, c.source, c.stackIdx, afterPlayLen(state.centerStacks[c.stackIdx].length)) < 3);
   return acceptable.length ? acceptable[0] : null;
 }
 
