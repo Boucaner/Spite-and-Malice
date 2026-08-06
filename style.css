@@ -49,6 +49,24 @@ html, body {
   color: var(--gold);
 }
 
+#title-group { display: flex; align-items: baseline; gap: 10px; }
+
+.back-to-hub {
+  font-size: .75rem;
+  color: #888;
+  text-decoration: none;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+}
+.back-to-hub:hover { color: var(--gold); text-decoration: underline; }
+
+/* Hide once installed as a home-screen app -- there's no "back" to a
+   browsing session to offer, and it'd break out of the app shell. */
+@media (display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui) {
+  .back-to-hub { display: none; }
+}
+
 #topbar-controls { display: flex; gap: 8px; }
 
 #topbar-controls button {
