@@ -208,7 +208,26 @@ function runAiStep(playerIdx) {
 function showGameOver() {
   const winner = state.players[state.winner];
   $('gameover-title').textContent = winner.isHuman ? 'You win!' : `${winner.name} wins!`;
+  if (winner.isHuman) showConfetti();
   elModalGameOver.classList.remove('hidden');
+}
+
+function showConfetti() {
+  const colors = ['#f4d03f', '#4ade80', '#60a5fa', '#f87171', '#c084fc', '#fb923c', '#ffffff'];
+  for (let i = 0; i < 120; i++) {
+    const el = document.createElement('div');
+    el.className = 'confetti-piece';
+    el.style.left             = Math.random() * 100 + 'vw';
+    el.style.width            = (7 + Math.random() * 7) + 'px';
+    el.style.height           = (7 + Math.random() * 7) + 'px';
+    el.style.background       = colors[Math.floor(Math.random() * colors.length)];
+    el.style.borderRadius     = Math.random() > 0.4 ? '2px' : '50%';
+    el.style.animationName     = Math.random() > 0.5 ? 'confetti-cw' : 'confetti-ccw';
+    el.style.animationDuration = (2 + Math.random() * 2.5) + 's';
+    el.style.animationDelay   = (Math.random() * 1.2) + 's';
+    document.body.appendChild(el);
+    el.addEventListener('animationend', () => el.remove());
+  }
 }
 
 // ── Rendering ─────────────────────────────────────────────────────────────────

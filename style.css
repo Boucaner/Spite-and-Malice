@@ -525,6 +525,26 @@ html, body {
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
+/* ── Confetti ─────────────────────────────────────────────── */
+@keyframes confetti-cw {
+  0%   { transform: translateY(0) rotate(0deg);     opacity: 1; }
+  85%  { opacity: 1; }
+  100% { transform: translateY(110vh) rotate(540deg);  opacity: 0; }
+}
+@keyframes confetti-ccw {
+  0%   { transform: translateY(0) rotate(0deg);     opacity: 1; }
+  85%  { opacity: 1; }
+  100% { transform: translateY(110vh) rotate(-540deg); opacity: 0; }
+}
+.confetti-piece {
+  position: fixed;
+  top: -14px;
+  pointer-events: none;
+  z-index: 300;
+  animation-fill-mode: forwards;
+  animation-timing-function: linear;
+}
+
 .name-row {
   flex-direction: row !important;
   align-items: center;
