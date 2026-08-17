@@ -352,6 +352,16 @@ function computeAiPlay(playerIdx) {
   // blocked side stack unlocks whatever's buried beneath it, whereas hand
   // cards are better held back to connect plays or cover the end-of-turn
   // discard. Kings stay lowest of all, saved for when nothing else fits.
+  //
+  // Exception: playing your very last hand card empties your hand mid-turn,
+  // which refills it to 5 and keeps the turn going -- a real tempo advantage
+  // (more cards played, more board control, before the opponent gets a
+  // turn). That's worth grabbing over a side-stack play, so it jumps to sit
+  // just below the goal pile instead of below the side stacks. Only the
+  // exact play that empties the hand gets the boost; with 2+ cards left,
+  // side stacks still go first as usual.
+  const emptiesHand = p.hand.length === 1;
+
   p.sideStacks.forEach((s, idx) => {
     if (s.length === 0) return;
     const card = topOf(s);
@@ -362,13 +372,13 @@ function computeAiPlay(playerIdx) {
   p.hand.forEach(card => {
     if (isWild(card)) return;
     const targets = legalCenterTargets(card);
-    if (targets.length) candidates.push({ priority: 2, source: { type: 'hand', cardId: card.id }, stackIdx: pickBestTarget(playerIdx, { type: 'hand', cardId: card.id }, targets) });
+    if (targets.length) candidates.push({ priority: emptiesHand ? 0.5 : 2, source: { type: 'hand', cardId: card.id }, stackIdx: pickBestTarget(playerIdx, { type: 'hand', cardId: card.id }, targets) });
   });
 
   p.hand.forEach(card => {
     if (!isWild(card)) return;
     const targets = legalCenterTargets(card);
-    if (targets.length) candidates.push({ priority: 3, source: { type: 'hand', cardId: card.id }, stackIdx: pickBestTarget(playerIdx, { type: 'hand', cardId: card.id }, targets) });
+    if (targets.length) candidates.push({ priority: emptiesHand ? 0.5 : 3, source: { type: 'hand', cardId: card.id }, stackIdx: pickBestTarget(playerIdx, { type: 'hand', cardId: card.id }, targets) });
   });
 
   if (!candidates.length) return null;
