@@ -250,7 +250,7 @@ function renderOpponents() {
 
     const nameEl = document.createElement('div');
     nameEl.className = 'opponent-name';
-    nameEl.textContent = p.finished ? `${p.name} — WINNER` : p.name;
+    nameEl.textContent = p.finished ? `${p.name} — WINNER` : `${p.name} (${p.hand.length})`;
     seat.appendChild(nameEl);
 
     const pilesRow = document.createElement('div');
