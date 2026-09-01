@@ -208,6 +208,12 @@ function runAiStep(playerIdx) {
 function showGameOver() {
   const winner = state.players[state.winner];
   $('gameover-title').textContent = winner.isHuman ? 'You win!' : `${winner.name} wins!`;
+
+  const others = state.players.filter((_, i) => i !== state.winner);
+  const smackdown = others.length > 0 &&
+    others.every(p => p.goalPile.length === state.settings.goalPileSize);
+  $('gameover-smackdown').classList.toggle('hidden', !smackdown);
+
   if (winner.isHuman) showConfetti();
   elModalGameOver.classList.remove('hidden');
 }

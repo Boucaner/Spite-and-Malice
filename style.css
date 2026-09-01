@@ -586,6 +586,22 @@ html, body {
 
 #gameover-title { text-align: center; color: var(--gold); }
 
+.smackdown-banner {
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #f87171;
+  text-shadow: 0 0 12px rgba(248,113,113,.6);
+  animation: smackdown-pulse .7s ease-in-out infinite alternate;
+}
+.smackdown-banner.hidden { display: none; }
+@keyframes smackdown-pulse {
+  from { transform: scale(1);    opacity: .85; }
+  to   { transform: scale(1.06); opacity: 1;   }
+}
+
 /* ── Pile viewer ──────────────────────────────────────────── */
 .pile-view-hint {
   font-size: .8rem;
