@@ -19,6 +19,7 @@ const elModalPileView   = $('modal-pile-view');
 const STACK_PREVIEW_COUNT = 2; // side stacks only show their top N cards in place
 
 let selected = null; // { type:'goal' } | { type:'side', idx } | { type:'hand', cardId }
+let winStreak = loadStored('spiteMaliceWinStreak', 0);
 
 console.log('%c[Spite and Malice] ui.js loaded', 'color:lime;font-weight:bold');
 
@@ -213,6 +214,11 @@ function showGameOver() {
   const smackdown = others.length > 0 &&
     others.every(p => p.goalPile.length === state.settings.goalPileSize);
   $('gameover-smackdown').classList.toggle('hidden', !smackdown);
+
+  winStreak = winner.isHuman ? winStreak + 1 : 0;
+  localStorage.setItem('spiteMaliceWinStreak', JSON.stringify(winStreak));
+  $('gameover-streak').textContent = `🔥 ${winStreak}-game winning streak!`;
+  $('gameover-streak').classList.toggle('hidden', !(winner.isHuman && winStreak >= 2));
 
   if (winner.isHuman) showConfetti();
   elModalGameOver.classList.remove('hidden');

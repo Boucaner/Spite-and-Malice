@@ -602,6 +602,14 @@ html, body {
   to   { transform: scale(1.06); opacity: 1;   }
 }
 
+.streak-line {
+  text-align: center;
+  font-weight: 700;
+  color: var(--gold);
+  margin: -6px 0 8px;
+}
+.streak-line.hidden { display: none; }
+
 /* ── Pile viewer ──────────────────────────────────────────── */
 .pile-view-hint {
   font-size: .8rem;
