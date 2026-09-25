@@ -217,6 +217,28 @@ function discardToSideStack(playerIdx, cardId, sideIdx) {
 function endTurn() {
   state.currentTurn = (state.currentTurn + 1) % state.players.length;
   drawToFive(currentPlayer());
+  checkStalemate();
+}
+
+// True dead end: no cards left to ever draw (stock and reserve both empty)
+// and no player -- via goal pile, side stacks, or hand -- has any card that
+// legally fits any center stack right now. Since nothing can complete a
+// center stack from here, the reserve can never refill either, so this
+// state can never change on its own.
+function hasAnyLegalPlay() {
+  return state.players.some(p => {
+    if (p.finished) return false;
+    const goalCard = topOf(p.goalPile);
+    if (goalCard && legalCenterTargets(goalCard).length) return true;
+    if (p.sideStacks.some(s => { const c = topOf(s); return c && legalCenterTargets(c).length; })) return true;
+    return p.hand.some(c => legalCenterTargets(c).length);
+  });
+}
+
+function checkStalemate() {
+  if (state.phase === 'playing' && state.stock.length === 0 && state.reserve.length === 0 && !hasAnyLegalPlay()) {
+    state.phase = 'stalemate';
+  }
 }
 
 // ── AI decision-making ───────────────────────────────────────────────────────

@@ -172,6 +172,7 @@ function onOwnSideSlotClick(sideIdx) {
   render();
   endTurn();
   render();
+  if (state.phase === 'stalemate') { showStalemate(); return; }
   scheduleAiIfNeeded();
 }
 
@@ -201,6 +202,7 @@ function runAiStep(playerIdx) {
   render();
   endTurn();
   render();
+  if (state.phase === 'stalemate') { showStalemate(); return; }
   scheduleAiIfNeeded();
 }
 
@@ -221,6 +223,13 @@ function showGameOver() {
   $('gameover-streak').classList.toggle('hidden', !(winner.isHuman && winStreak >= 2));
 
   if (winner.isHuman) showConfetti();
+  elModalGameOver.classList.remove('hidden');
+}
+
+function showStalemate() {
+  $('gameover-title').textContent = "Stalemate — it's a draw!";
+  $('gameover-smackdown').classList.add('hidden');
+  $('gameover-streak').classList.add('hidden');
   elModalGameOver.classList.remove('hidden');
 }
 
@@ -436,7 +445,7 @@ function renderPlayerZone() {
 }
 
 function statusMessage(myTurn, selectedCard, sel) {
-  if (state.phase === 'gameEnd') return '';
+  if (state.phase !== 'playing') return '';
   if (!myTurn) return `${currentPlayer().name}'s turn…`;
   if (!sel) return 'Your turn — select a card to play, or select a hand card to discard.';
   if (!selectedCard) return 'Your turn — select a card to play, or select a hand card to discard.';

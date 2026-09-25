@@ -25,9 +25,9 @@ function runGame(numPlayers, maxTurns) {
       if (!action) break;
       ctx.__action = action;
       vm.runInContext('playToCenter(state.currentTurn, __action.source, __action.stackIdx)', ctx);
-      if (vm.runInContext('state.phase', ctx) === 'gameEnd') break;
+      if (vm.runInContext('state.phase', ctx) !== 'playing') break;
     }
-    if (vm.runInContext('state.phase', ctx) === 'gameEnd') break;
+    if (vm.runInContext('state.phase', ctx) !== 'playing') break;
 
     const discard = vm.runInContext('computeAiDiscard(state.currentTurn)', ctx);
     if (discard) {
@@ -54,7 +54,7 @@ function runGame(numPlayers, maxTurns) {
 
   console.log(`players=${numPlayers} turns=${turns} phase=${phase} winner=${phase === 'gameEnd' ? players[winner].name : '-'} totalCards=${total} expected=${52 * numPlayers}`);
   if (total !== 52 * numPlayers) throw new Error('Card count mismatch! Cards were lost or duplicated.');
-  if (phase !== 'gameEnd') throw new Error(`Game did not finish within ${maxTurns} turns`);
+  if (phase === 'playing') throw new Error(`Game did not finish within ${maxTurns} turns`);
 }
 
 for (const n of [2, 3, 4]) {
