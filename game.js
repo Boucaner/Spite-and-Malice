@@ -242,220 +242,192 @@ function checkStalemate() {
 }
 
 // ── AI decision-making ───────────────────────────────────────────────────────
+//
+// The AI plans its whole turn rather than grabbing one card at a time. It
+// searches every order it could play its cards in -- including stopping
+// early and holding cards back -- and picks the sequence whose final board
+// scores best: its own progress, minus every way the board it leaves behind
+// lets an opponent play from their goal pile. computeAiPlay re-plans from
+// scratch before every single play, so a mid-turn hand refill (five new,
+// previously unseen cards) is picked up naturally on the next call.
 
-// How urgent it is to avoid exposing an opponent's current goal-pile card,
-// keyed by how many cards are left in their goal pile. 3 = they'd very
-// likely win outright on their next turn; 0 = far enough out not to matter.
-function baseExposureUrgency(goalPileLength) {
-  if (goalPileLength === 1) return 3;
-  if (goalPileLength === 2) return 2;
-  if (goalPileLength <= 4) return 1;
-  return 0;
+const AI_SCORE = {
+  WIN: 1e6,
+  OWN_GOAL_CARD: 100, // each of our own goal cards played this turn
+  OWN_GOAL_READY: 20, // our next goal card left close to playable (scaled by GAP_PROB)
+  SIDE_CARD: 6,       // each side-stack card cleared -- unburies the one beneath
+  HAND_CARD: 2,       // each hand card played -- more fresh cards drawn next turn
+  KING_SPENT: -12,    // a King played from hand is a wildcard we no longer hold
+  REFILL: 25,         // emptying the hand mid-turn draws five more and the turn continues
+  OPP_GOAL_CARD: 80,  // an opponent goal card we leave playable (scaled by threat and GAP_PROB)
+};
+
+// Chance an opponent can reach their goal card when the nearest center stack
+// is `gap` cards short of it. 0 = already playable. Beyond that they need the
+// missing rank(s) -- or a wild King -- in a hand we can't see: with two decks,
+// roughly half the time for one specific rank, much less for two in a row.
+const GAP_PROB = [1, 0.5, 0.15, 0.04];
+
+// How much an opponent's goal card is worth denying, keyed by how many goal
+// cards they have left. Every goal card counts all game long, but the closer
+// they are to winning the more each one matters; at one card left, letting
+// them play it is a loss, which nothing short of our own win outweighs.
+function oppThreatMultiplier(goalPileLength) {
+  if (goalPileLength === 1) return 50;
+  if (goalPileLength === 2) return 3;
+  if (goalPileLength <= 4) return 1.5;
+  return 1;
 }
 
-// If we're already this far behind a threatened opponent, playing defense
-// against them costs tempo we can't spare -- they'll likely find another
-// opening soon regardless, so there's little point sacrificing our own
-// plays to delay them. Ease off by a tier instead.
-const DESPERATION_GAP = 6;
-
-// Worst-case urgency (0-3) of growing centerStacks[stackIdx] to newLen,
-// across every active opponent it would expose -- using only cards already
-// visible to every player (their goal-pile top and side-stack tops, chained
-// through the center stacks). Never their hand, which is hidden information
-// in the real game.
-function worstExposureUrgency(playerIdx, stackIdx, newLen) {
-  const lens = state.centerStacks.map((s, i) => (i === stackIdx ? newLen : s.length));
-  const self = state.players[playerIdx];
-  let worst = 0;
-
-  state.players.forEach((opp, oppIdx) => {
-    if (oppIdx === playerIdx || opp.finished || opp.goalPile.length === 0) return;
-    const baseUrgency = baseExposureUrgency(opp.goalPile.length);
-    if (baseUrgency === 0) return;
-
-    const goalCard = topOf(opp.goalPile);
-
-    // Check direct exposure -- does the goal card already fit one of these
-    // stacks with no chaining needed -- before simulating any side-stack
-    // chaining below. Otherwise a side-stack card of the same rank as the
-    // goal card (e.g. both are sixes) can spuriously "consume" the exact
-    // slot the goal card needs first, hiding a real, immediate win: the
-    // opponent would obviously play their winning goal card into that slot
-    // themselves, not waste it on a side card.
-    let exposed = lens.some(len => matchesCenterPos(goalCard, len));
-
-    if (!exposed) {
-      const workingLens = lens.slice();
-      const used = new Array(opp.sideStacks.length).fill(false);
-      let progressed = true;
-      while (progressed) {
-        progressed = false;
-        for (let i = 0; i < opp.sideStacks.length; i++) {
-          if (used[i] || opp.sideStacks[i].length === 0) continue;
-          const card = topOf(opp.sideStacks[i]);
-          const idx = workingLens.findIndex(len => matchesCenterPos(card, len));
-          if (idx !== -1) {
-            workingLens[idx]++;
-            used[i] = true;
-            progressed = true;
-          }
-        }
+// Gap (0-3, or Infinity) between `goalCard` and the nearest center stack it
+// could eventually land on, after first chaining whatever `sideTops` (cards
+// face-up and visible to everyone) can legally play. Hand cards are never
+// considered here: an opponent's hand is hidden information, which is what
+// GAP_PROB is for.
+function goalCardGap(goalCard, lens, sideTops) {
+  if (isWild(goalCard)) return 0;
+  const workingLens = lens.slice();
+  const used = new Array(sideTops.length).fill(false);
+  let progressed = true;
+  while (progressed) {
+    if (workingLens.some(len => matchesCenterPos(goalCard, len))) return 0;
+    progressed = false;
+    for (let i = 0; i < sideTops.length; i++) {
+      if (used[i] || !sideTops[i]) continue;
+      const idx = workingLens.findIndex(len => matchesCenterPos(sideTops[i], len));
+      if (idx !== -1) {
+        workingLens[idx] = afterPlayLen(workingLens[idx]);
+        used[i] = true;
+        progressed = true;
       }
-      exposed = workingLens.some(len => matchesCenterPos(goalCard, len));
     }
+  }
+  const pos = RANK_SEQ.indexOf(goalCard.value);
+  let gap = Infinity;
+  for (const len of workingLens) if (len <= pos) gap = Math.min(gap, pos - len);
+  return gap;
+}
 
-    if (!exposed) return;
+function gapProb(gap) {
+  return gap < GAP_PROB.length ? GAP_PROB[gap] : 0;
+}
 
-    // Never discount a tier-3 exposure: that means the opponent has exactly
-    // one goal card and this would hand them a certain, immediate win, not
-    // a probabilistic risk -- there's no "they'll find another opening
-    // anyway" argument to be made when the loss is guaranteed right now.
-    const desperate = baseUrgency < 3 && self.goalPile.length - opp.goalPile.length >= DESPERATION_GAP;
-    const urgency = desperate ? baseUrgency - 1 : baseUrgency;
-    worst = Math.max(worst, urgency);
+// Score of ending our turn on center stack lengths `lens`, having made the
+// plays recorded in the other arguments.
+function scoreAiTurnEnd(playerIdx, lens, goalUsed, sideUsed, handMask, hand) {
+  const p = state.players[playerIdx];
+  let score = goalUsed * AI_SCORE.OWN_GOAL_CARD;
+
+  sideUsed.forEach(n => { score += n * AI_SCORE.SIDE_CARD; });
+  hand.forEach((card, j) => {
+    if (!(handMask & (1 << j))) return;
+    score += AI_SCORE.HAND_CARD + (isWild(card) ? AI_SCORE.KING_SPENT : 0);
   });
 
-  return worst;
-}
-
-// Urgency of playing `source` onto centerStacks[stackIdx] (growing it to
-// newLen). Goal-pile plays get a trade offset: if removing our own top goal
-// card immediately hands us a legal play for the card beneath it, exposing
-// an opponent is far more acceptable since we get something concrete back
-// the same turn.
-function playUrgency(playerIdx, source, stackIdx, newLen) {
-  if (setsUpImmediateWin(playerIdx, source, newLen)) return 0;
-
-  const urgency = worstExposureUrgency(playerIdx, stackIdx, newLen);
-  // Same principle as the desperation discount above: a tier-3 urgency means
-  // a guaranteed win for whichever opponent is down to their last card, so
-  // the trade offset -- meant to make a probabilistic risk more acceptable
-  // in exchange for concrete progress -- must never apply to it.
-  if (urgency === 0 || urgency >= 3 || source.type !== 'goal') return urgency;
-
-  const p = state.players[playerIdx];
-  const nextCard = p.goalPile[p.goalPile.length - 2];
-  if (!nextCard) return urgency;
-
-  const lens = state.centerStacks.map((s, i) => (i === stackIdx ? newLen : s.length));
-  return lens.some(len => matchesCenterPos(nextCard, len)) ? Math.max(0, urgency - 2) : urgency;
-}
-
-// Would playing `source` onto centerStacks[stackIdx] (growing it to newLen)
-// immediately open a legal spot for our own current goal-pile card? A card
-// with several legal targets -- most notably a wild King -- should chain
-// into our own goal pile whenever it can, since advancing the goal pile is
-// how we actually win; that always outranks generic "extend the tallest
-// stack" tie-breaking.
-function enablesOwnGoalFollowUp(playerIdx, source, newLen) {
-  if (source.type === 'goal') return false;
-  const goalCard = topOf(state.players[playerIdx].goalPile);
-  return goalCard != null && matchesCenterPos(goalCard, newLen);
-}
-
-// If our goal pile is down to its last card, does playing `source` onto
-// centerStacks[stackIdx] set up an immediate win -- i.e. will that final
-// goal card now have a legal target? If so the game ends on our very next
-// move this same turn, before any opponent gets a turn to exploit whatever
-// this exposed, so ordinary exposure-risk checks don't apply.
-function setsUpImmediateWin(playerIdx, source, newLen) {
-  const p = state.players[playerIdx];
-  return source.type !== 'goal' && p.goalPile.length === 1 && matchesCenterPos(topOf(p.goalPile), newLen);
-}
-
-// Prefer continuing the most-advanced stack so completed stacks recycle
-// sooner, but steer away from targets with higher exposure urgency (see
-// playUrgency) whenever a less risky legal target is available, and prefer
-// a target that chains into our own goal pile over either of those.
-function pickBestTarget(playerIdx, source, targets) {
-  const urgencies = targets.map(t => playUrgency(playerIdx, source, t, afterPlayLen(state.centerStacks[t].length)));
-  const minUrgency = Math.min(...urgencies);
-  const pool = targets.filter((t, i) => urgencies[i] === minUrgency);
-
-  const chaining = pool.filter(t => enablesOwnGoalFollowUp(playerIdx, source, afterPlayLen(state.centerStacks[t].length)));
-  const finalPool = chaining.length ? chaining : pool;
-
-  return finalPool.reduce((best, t) =>
-    state.centerStacks[t].length > state.centerStacks[best].length ? t : best, finalPool[0]);
-}
-
-// Returns the best available play for playerIdx, or null if none exists --
-// including the case where every legal play is too dangerous to make (see
-// playUrgency), in which case the AI deliberately holds back and just discards.
-function computeAiPlay(playerIdx) {
-  const p = state.players[playerIdx];
-  const candidates = [];
-
-  if (p.goalPile.length > 0) {
-    const card = topOf(p.goalPile);
-    const targets = legalCenterTargets(card);
-    if (targets.length) candidates.push({ priority: 0, source: { type: 'goal' }, stackIdx: pickBestTarget(playerIdx, { type: 'goal' }, targets) });
+  const ownGoal = p.goalPile[p.goalPile.length - 1 - goalUsed];
+  if (ownGoal) {
+    const ownSideTops = p.sideStacks.map((s, i) => s[s.length - 1 - sideUsed[i]] || null);
+    score += AI_SCORE.OWN_GOAL_READY * gapProb(goalCardGap(ownGoal, lens, ownSideTops));
   }
 
-  // After the goal pile, clearing side stacks outranks the hand -- freeing a
-  // blocked side stack unlocks whatever's buried beneath it, whereas hand
-  // cards are better held back to connect plays or cover the end-of-turn
-  // discard. Kings stay lowest of all, saved for when nothing else fits.
-  //
-  // Exception: playing your very last hand card empties your hand mid-turn,
-  // which refills it to 5 and keeps the turn going -- a real tempo advantage
-  // (more cards played, more board control, before the opponent gets a
-  // turn). That's worth grabbing over a side-stack play, so it jumps to sit
-  // just below the goal pile instead of below the side stacks. Only the
-  // exact play that empties the hand gets the boost; with 2+ cards left,
-  // side stacks still go first as usual.
-  const emptiesHand = p.hand.length === 1;
-
-  p.sideStacks.forEach((s, idx) => {
-    if (s.length === 0) return;
-    const card = topOf(s);
-    const targets = legalCenterTargets(card);
-    if (targets.length) candidates.push({ priority: 1, source: { type: 'side', idx }, stackIdx: pickBestTarget(playerIdx, { type: 'side', idx }, targets) });
+  const n = state.players.length;
+  state.players.forEach((opp, oppIdx) => {
+    if (oppIdx === playerIdx || opp.finished || opp.goalPile.length === 0) return;
+    const prob = gapProb(goalCardGap(topOf(opp.goalPile), lens, opp.sideStacks.map(topOf)));
+    if (!prob) return;
+    // The next player to move gets the board exactly as we leave it; anyone
+    // further around the table sees it only after others have changed it.
+    const turnWeight = (oppIdx - playerIdx + n) % n === 1 ? 1 : 0.5;
+    score -= AI_SCORE.OPP_GOAL_CARD * oppThreatMultiplier(opp.goalPile.length) * prob * turnWeight;
   });
 
-  p.hand.forEach(card => {
-    if (isWild(card)) return;
-    const targets = legalCenterTargets(card);
-    if (targets.length) candidates.push({ priority: emptiesHand ? 0.5 : 2, source: { type: 'hand', cardId: card.id }, stackIdx: pickBestTarget(playerIdx, { type: 'hand', cardId: card.id }, targets) });
-  });
+  return score;
+}
 
-  p.hand.forEach(card => {
-    if (!isWild(card)) return;
-    const targets = legalCenterTargets(card);
-    if (targets.length) candidates.push({ priority: emptiesHand ? 0.5 : 3, source: { type: 'hand', cardId: card.id }, stackIdx: pickBestTarget(playerIdx, { type: 'hand', cardId: card.id }, targets) });
-  });
+// Searches every sequence of plays available this turn and returns
+// { score, move }, where move is the first play of the best sequence
+// ({ source, targetLen }) or null if the best option is to stop playing now.
+// Center stacks are interchangeable apart from their lengths, so plays are
+// expressed by target length and states are memoized on sorted lengths.
+const AI_SEARCH_NODE_LIMIT = 15000;
 
-  if (!candidates.length) return null;
+function planAiTurn(playerIdx) {
+  const p = state.players[playerIdx];
+  const hand = p.hand.slice();
+  const fullHandMask = (1 << hand.length) - 1;
+  const memo = new Map();
+  let nodes = 0;
 
-  // Finishing our goal pile -- or setting up an unstoppable follow-up that
-  // will finish it on the very next iteration this same turn (see
-  // setsUpImmediateWin) -- ends the game before any opponent gets another
-  // turn. That overrides normal source-type priority and safety checks, so
-  // a wild King setting up the win beats a mundane side-stack play every
-  // time, not just when the goal card already happens to sort first.
-  const winningPlay = candidates.find(c =>
-    (c.source.type === 'goal' && p.goalPile.length === 1) ||
-    setsUpImmediateWin(playerIdx, c.source, afterPlayLen(state.centerStacks[c.stackIdx].length)));
-  if (winningPlay) return winningPlay;
+  function search(lens, goalUsed, sideUsed, handMask) {
+    const key = `${lens.slice().sort((a, b) => a - b).join(',')}|${goalUsed}|${sideUsed.join(',')}|${handMask}`;
+    const cached = memo.get(key);
+    if (cached) return cached;
 
-  candidates.sort((a, b) => {
-    if (a.priority !== b.priority) return a.priority - b.priority;
-    // Among equally-ranked side-stack plays, clear the most-blocked (tallest) one first.
-    if (a.source.type === 'side' && b.source.type === 'side') {
-      return p.sideStacks[b.source.idx].length - p.sideStacks[a.source.idx].length;
+    let best = { score: scoreAiTurnEnd(playerIdx, lens, goalUsed, sideUsed, handMask, hand), move: null };
+    if (++nodes > AI_SEARCH_NODE_LIMIT) { memo.set(key, best); return best; }
+
+    const sources = [];
+    const goalCard = p.goalPile[p.goalPile.length - 1 - goalUsed];
+    if (goalCard) sources.push({ card: goalCard, source: { type: 'goal' } });
+    p.sideStacks.forEach((s, i) => {
+      const card = s[s.length - 1 - sideUsed[i]];
+      if (card) sources.push({ card, source: { type: 'side', idx: i } });
+    });
+    const seenValues = new Set();
+    hand.forEach((card, j) => {
+      if ((handMask & (1 << j)) || seenValues.has(card.value)) return;
+      seenValues.add(card.value);
+      sources.push({ card, source: { type: 'hand', cardId: card.id }, handBit: 1 << j });
+    });
+
+    for (const { card, source, handBit } of sources) {
+      const triedLens = new Set();
+      for (const len of lens) {
+        if (triedLens.has(len) || !matchesCenterPos(card, len)) continue;
+        triedLens.add(len);
+        const move = { source, targetLen: len };
+
+        // Our last goal card ends the game on the spot.
+        if (source.type === 'goal' && goalUsed + 1 === p.goalPile.length) {
+          best = { score: AI_SCORE.WIN, move };
+          memo.set(key, best);
+          return best;
+        }
+
+        const nextLens = lens.slice();
+        nextLens[nextLens.indexOf(len)] = afterPlayLen(len);
+        const nextGoalUsed = goalUsed + (source.type === 'goal' ? 1 : 0);
+        const nextSideUsed = source.type === 'side'
+          ? sideUsed.map((n, i) => (i === source.idx ? n + 1 : n))
+          : sideUsed;
+        const nextHandMask = handMask | (handBit || 0);
+
+        let score;
+        if (handBit && nextHandMask === fullHandMask) {
+          // Emptying the hand refills it with unseen cards; value the refill
+          // and re-plan once it actually happens.
+          score = scoreAiTurnEnd(playerIdx, nextLens, nextGoalUsed, nextSideUsed, nextHandMask, hand) + AI_SCORE.REFILL;
+        } else {
+          score = search(nextLens, nextGoalUsed, nextSideUsed, nextHandMask).score;
+        }
+        if (score > best.score) best = { score, move };
+      }
     }
-    return 0;
-  });
 
-  // Rule out only the critical-urgency plays (tier 3 -- an opponent who'd
-  // very likely win outright next turn); anything milder is an acceptable
-  // trade-off, not a reason to skip a play. If every candidate is that
-  // dangerous, we deliberately pass on playing this cycle -- unless
-  // worstExposureUrgency has already discounted it for desperation, in
-  // which case it won't reach tier 3 and we'll take it below.
-  const acceptable = candidates.filter(c => playUrgency(playerIdx, c.source, c.stackIdx, afterPlayLen(state.centerStacks[c.stackIdx].length)) < 3);
-  return acceptable.length ? acceptable[0] : null;
+    memo.set(key, best);
+    return best;
+  }
+
+  return search(state.centerStacks.map(s => s.length), 0, p.sideStacks.map(() => 0), 0);
+}
+
+// Returns the next play of the AI's best plan for this turn ({ source,
+// stackIdx }), or null if the plan is to stop playing and discard.
+function computeAiPlay(playerIdx) {
+  const { move } = planAiTurn(playerIdx);
+  if (!move) return null;
+  const stackIdx = state.centerStacks.findIndex(s => s.length === move.targetLen);
+  return { source: move.source, stackIdx };
 }
 
 const SIDE_STACK_RANK_VALUE = { A: 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, J: 11, Q: 12, K: 13 };
