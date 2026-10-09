@@ -259,7 +259,11 @@ const AI_SCORE = {
   HAND_CARD: 2,       // each hand card played -- more fresh cards drawn next turn
   KING_SPENT: -12,    // a King played from hand is a wildcard we no longer hold
   REFILL: 25,         // emptying the hand mid-turn draws five more and the turn continues
-  OPP_GOAL_CARD: 80,  // an opponent goal card we leave playable (scaled by threat and GAP_PROB)
+  // An opponent goal card we leave playable (scaled by threat and GAP_PROB).
+  // Deliberately light ("Medium"): 80 made the AI nearly unbeatable in real
+  // play. At 5 it still never hands over a last-card win (threat x50 = 250
+  // outweighs its own goal card), but mostly leaves mid-game defense alone.
+  OPP_GOAL_CARD: 5,
 };
 
 // Chance an opponent can reach their goal card when the nearest center stack
@@ -324,7 +328,9 @@ function scoreAiTurnEnd(playerIdx, lens, goalUsed, sideUsed, handMask, hand) {
     score += AI_SCORE.HAND_CARD + (isWild(card) ? AI_SCORE.KING_SPENT : 0);
   });
 
-  const ownGoal = p.goalPile[p.goalPile.length - 1 - goalUsed];
+  // Only the top goal card is face-up. Once this plan plays it, the card
+  // beneath is unknown until it's actually turned over, so it can't count.
+  const ownGoal = goalUsed === 0 ? topOf(p.goalPile) : null;
   if (ownGoal) {
     const ownSideTops = p.sideStacks.map((s, i) => s[s.length - 1 - sideUsed[i]] || null);
     score += AI_SCORE.OWN_GOAL_READY * gapProb(goalCardGap(ownGoal, lens, ownSideTops));
@@ -366,8 +372,12 @@ function planAiTurn(playerIdx) {
     let best = { score: scoreAiTurnEnd(playerIdx, lens, goalUsed, sideUsed, handMask, hand), move: null };
     if (++nodes > AI_SEARCH_NODE_LIMIT) { memo.set(key, best); return best; }
 
+    // The goal card under the one we play stays face-down until it's turned
+    // over for real, so a plan can include at most one goal-pile play. Once
+    // that play happens, computeAiPlay re-plans and sees the newly revealed
+    // card the same way a human would.
     const sources = [];
-    const goalCard = p.goalPile[p.goalPile.length - 1 - goalUsed];
+    const goalCard = goalUsed === 0 ? topOf(p.goalPile) : null;
     if (goalCard) sources.push({ card: goalCard, source: { type: 'goal' } });
     p.sideStacks.forEach((s, i) => {
       const card = s[s.length - 1 - sideUsed[i]];
